@@ -2,17 +2,53 @@
 
 <html>
     <head>
-        <title>canvane</title>
-        <script src="static/index.js" type="module"></script>
+        <title>rakugaki</title>
+
+        <link rel="stylesheet" href="static/index.css">
+        
         <script src="static/live-reload.js" type="module"></script>
+
+        <script src="static/brush-editor.js" type="module"></script>
+        <script src="static/canvas-renderer.js" type="module"></script>
+        <script src="static/framework.js" type="module"></script>
+        <script src="static/reticle-renderer.js" type="module"></script>
+        <script src="static/session.js" type="module"></script>
+        <script src="static/throbber.js" type="module"></script>
+        <script src="static/viewport.js" type="module"></script>
+        <script src="static/welcome.js" type="module"></script>        
+        
+        <script src="static/index.js" type="module"></script>
     </head>
 
     <body>
         <main>
-            <canvas id="render" width="256" height="256">Please enable JavaScript</canvas>
-            <br>
-            <textarea id="code" cols="80" rows="25">(stroke 1 (rgba 0 0 0 255) (vec 32 32))</textarea>
-            <p id="output" style="white-space: pre-wrap;"></p>
+            <rkgk-canvas-renderer></rkgk-canvas-renderer>
+            <rkgk-reticle-renderer></rkgk-reticle-renderer>
+            <rkgk-brush-editor></rkgk-brush-editor>
+
+            <rkgk-welcome>
+                <dialog name="welcome-dialog" class="rkgk-panel">
+                    <form method="dialog">
+                        <h3>
+                            My name is
+                            <input
+                                name="nickname"
+                                type="text"
+                                required minlength="1" maxlength="32"
+                                placeholder="... (type here!)"
+                                autocomplete="off"
+                                autofocus></input>
+                        </h3>
+                        <p>This name will be visible to any friends drawing along with you, so choose something recognizable!<br>
+                        Keep in mind you can always change it later.</p>
+
+                        <div style="display: flex; flex-direction: row; align-items: center; justify-content: end; gap: 8px;">
+                            <rkgk-throbber name="register-progress"></rkgk-throbber>
+                            <button name="register">Register</button>
+                        </div>
+                    </form>
+                </dialog>
+            </rkgk-welcome>
         </main>
     </body>
 </html>

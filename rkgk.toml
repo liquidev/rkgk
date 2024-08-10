@@ -1,0 +1,5 @@
+[wall]
+max_chunks = 65536
+max_sessions = 128
+chunk_size = 168
+

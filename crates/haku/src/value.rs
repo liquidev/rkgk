@@ -146,6 +146,7 @@ pub struct Closure {
 #[derive(Debug, Clone)]
 pub enum Shape {
     Point(Vec4),
+    Line(Vec4, Vec4),
 }
 
 #[derive(Debug, Clone)]

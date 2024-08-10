@@ -134,7 +134,8 @@ pub mod fns {
             0x89 ".a" => rgba_a,
 
             0xc0 "to-shape" => to_shape_f,
-            0xc1 "stroke" => stroke,
+            0xc1 "line" => line,
+            0xe0 "stroke" => stroke,
         }
     }
 
@@ -388,14 +389,16 @@ pub mod fns {
         Ok(Value::Number(rgba.r))
     }
 
-    fn to_shape(value: Value, _vm: &Vm) -> Option<Shape> {
+    fn to_shape(value: Value, vm: &Vm) -> Option<Shape> {
         match value {
-            Value::Nil
-            | Value::False
-            | Value::True
-            | Value::Number(_)
-            | Value::Rgba(_)
-            | Value::Ref(_) => None,
+            Value::Nil | Value::False | Value::True | Value::Number(_) | Value::Rgba(_) => None,
+            Value::Ref(id) => {
+                if let Ref::Shape(shape) = vm.get_ref(id) {
+                    Some(shape.clone())
+                } else {
+                    None
+                }
+            }
             Value::Vec4(vec) => Some(Shape::Point(vec)),
         }
     }
@@ -411,6 +414,19 @@ pub mod fns {
         } else {
             Ok(Value::Nil)
         }
+    }
+
+    pub fn line(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
+        if args.num() != 2 {
+            return Err(vm.create_exception("(line) expects 2 arguments (line start end)"));
+        }
+
+        static ERROR: &str = "arguments to (line) must be (vec)";
+        let start = args.get_vec4(vm, 0, ERROR)?;
+        let end = args.get_vec4(vm, 1, ERROR)?;
+
+        let id = vm.create_ref(Ref::Shape(Shape::Line(start, end)))?;
+        Ok(Value::Ref(id))
     }
 
     pub fn stroke(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {

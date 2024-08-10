@@ -6,7 +6,7 @@ use core::{
 use alloc::vec::Vec;
 
 use crate::{
-    bytecode::{Chunk, DefError, DefId, Defs, EmitError, Opcode, CAPTURE_CAPTURE, CAPTURE_LOCAL},
+    bytecode::{Chunk, DefError, Defs, EmitError, Opcode, CAPTURE_CAPTURE, CAPTURE_LOCAL},
     sexp::{Ast, NodeId, NodeKind, Span},
     system::System,
 };

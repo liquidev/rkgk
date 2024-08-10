@@ -2,16 +2,19 @@
 
 extern crate alloc;
 
-use core::{alloc::Layout, ffi::CStr, slice, str};
+use core::{alloc::Layout, slice};
 
 use alloc::{boxed::Box, vec::Vec};
 use haku::{
     bytecode::{Chunk, Defs, DefsImage},
     compiler::{compile_expr, CompileError, Compiler, Diagnostic, Source},
-    render::{Bitmap, Renderer, RendererLimits},
-    sexp::{self, parse_toplevel, Ast, Parser},
+    render::{
+        tiny_skia::{Pixmap, PremultipliedColorU8},
+        Renderer, RendererLimits,
+    },
+    sexp::{parse_toplevel, Ast, Parser},
     system::{ChunkId, System, SystemImage},
-    value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
+    value::{BytecodeLoc, Closure, FunctionName, Ref},
     vm::{Exception, Vm, VmImage, VmLimits},
 };
 use log::info;
@@ -42,7 +45,7 @@ struct Limits {
     call_stack_capacity: usize,
     ref_capacity: usize,
     fuel: usize,
-    bitmap_stack_capacity: usize,
+    pixmap_stack_capacity: usize,
     transform_stack_capacity: usize,
 }
 
@@ -57,7 +60,7 @@ impl Default for Limits {
             call_stack_capacity: 256,
             ref_capacity: 2048,
             fuel: 65536,
-            bitmap_stack_capacity: 4,
+            pixmap_stack_capacity: 4,
             transform_stack_capacity: 16,
         }
     }
@@ -116,6 +119,13 @@ unsafe extern "C" fn haku_instance_destroy(instance: *mut Instance) {
 }
 
 #[no_mangle]
+unsafe extern "C" fn haku_reset(instance: *mut Instance) {
+    let instance = &mut *instance;
+    instance.system.restore_image(&instance.system_image);
+    instance.defs.restore_image(&instance.defs_image);
+}
+
+#[no_mangle]
 unsafe extern "C" fn haku_has_exception(instance: *mut Instance) -> bool {
     (*instance).exception.is_some()
 }
@@ -145,6 +155,19 @@ enum StatusCode {
 #[no_mangle]
 extern "C" fn haku_is_ok(code: StatusCode) -> bool {
     code == StatusCode::Ok
+}
+
+#[no_mangle]
+extern "C" fn haku_is_diagnostics_emitted(code: StatusCode) -> bool {
+    code == StatusCode::DiagnosticsEmitted
+}
+
+#[no_mangle]
+extern "C" fn haku_is_exception(code: StatusCode) -> bool {
+    matches!(
+        code,
+        StatusCode::EvalException | StatusCode::RenderException
+    )
 }
 
 #[no_mangle]
@@ -261,37 +284,49 @@ unsafe extern "C" fn haku_compile_brush(
     StatusCode::Ok
 }
 
-struct BitmapLock {
-    bitmap: Option<Bitmap>,
+struct PixmapLock {
+    pixmap: Option<Pixmap>,
 }
 
 #[no_mangle]
-extern "C" fn haku_bitmap_new(width: u32, height: u32) -> *mut BitmapLock {
-    Box::leak(Box::new(BitmapLock {
-        bitmap: Some(Bitmap::new(width, height)),
+extern "C" fn haku_pixmap_new(width: u32, height: u32) -> *mut PixmapLock {
+    Box::leak(Box::new(PixmapLock {
+        pixmap: Some(Pixmap::new(width, height).expect("invalid pixmap size")),
     }))
 }
 
 #[no_mangle]
-unsafe extern "C" fn haku_bitmap_destroy(bitmap: *mut BitmapLock) {
-    drop(Box::from_raw(bitmap))
+unsafe extern "C" fn haku_pixmap_destroy(pixmap: *mut PixmapLock) {
+    drop(Box::from_raw(pixmap))
 }
 
 #[no_mangle]
-unsafe extern "C" fn haku_bitmap_data(bitmap: *mut BitmapLock) -> *mut u8 {
-    let bitmap = (*bitmap)
-        .bitmap
+unsafe extern "C" fn haku_pixmap_data(pixmap: *mut PixmapLock) -> *mut u8 {
+    let pixmap = (*pixmap)
+        .pixmap
         .as_mut()
-        .expect("bitmap is already being rendered to");
+        .expect("pixmap is already being rendered to");
 
-    bitmap.pixels[..].as_mut_ptr() as *mut u8
+    pixmap.pixels_mut().as_mut_ptr() as *mut u8
+}
+
+#[no_mangle]
+unsafe extern "C" fn haku_pixmap_clear(pixmap: *mut PixmapLock) {
+    let pixmap = (*pixmap)
+        .pixmap
+        .as_mut()
+        .expect("pixmap is already being rendered to");
+    pixmap.pixels_mut().fill(PremultipliedColorU8::TRANSPARENT);
 }
 
 #[no_mangle]
 unsafe extern "C" fn haku_render_brush(
     instance: *mut Instance,
     brush: *const Brush,
-    bitmap: *mut BitmapLock,
+    pixmap_a: *mut PixmapLock,
+    pixmap_b: *mut PixmapLock,
+    translation_x: f32,
+    translation_y: f32,
 ) -> StatusCode {
     let instance = &mut *instance;
     let brush = &*brush;
@@ -320,29 +355,46 @@ unsafe extern "C" fn haku_render_brush(
         }
     };
 
-    let bitmap_locked = (*bitmap)
-        .bitmap
-        .take()
-        .expect("bitmap is already being rendered to");
+    let mut render = |pixmap: *mut PixmapLock| {
+        let pixmap_locked = (*pixmap)
+            .pixmap
+            .take()
+            .expect("pixmap is already being rendered to");
 
-    let mut renderer = Renderer::new(
-        bitmap_locked,
-        &RendererLimits {
-            bitmap_stack_capacity: instance.limits.bitmap_stack_capacity,
-            transform_stack_capacity: instance.limits.transform_stack_capacity,
-        },
-    );
-    match renderer.render(&instance.vm, scribble) {
-        Ok(()) => (),
-        Err(exn) => {
-            instance.exception = Some(exn);
-            return StatusCode::RenderException;
+        let mut renderer = Renderer::new(
+            pixmap_locked,
+            &RendererLimits {
+                pixmap_stack_capacity: instance.limits.pixmap_stack_capacity,
+                transform_stack_capacity: instance.limits.transform_stack_capacity,
+            },
+        );
+        renderer.translate(translation_x, translation_y);
+        match renderer.render(&instance.vm, scribble) {
+            Ok(()) => (),
+            Err(exn) => {
+                instance.exception = Some(exn);
+                return StatusCode::RenderException;
+            }
+        }
+
+        let pixmap_locked = renderer.finish();
+
+        (*pixmap).pixmap = Some(pixmap_locked);
+
+        StatusCode::Ok
+    };
+
+    match render(pixmap_a) {
+        StatusCode::Ok => (),
+        other => return other,
+    }
+    if !pixmap_b.is_null() {
+        match render(pixmap_b) {
+            StatusCode::Ok => (),
+            other => return other,
         }
     }
 
-    let bitmap_locked = renderer.finish();
-
-    (*bitmap).bitmap = Some(bitmap_locked);
     instance.vm.restore_image(&instance.vm_image);
 
     StatusCode::Ok

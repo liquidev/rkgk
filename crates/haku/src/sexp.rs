@@ -203,6 +203,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[track_caller]
     pub fn current(&self) -> char {
         assert_ne!(self.fuel.get(), 0, "parser is stuck");
         self.fuel.set(self.fuel.get() - 1);
@@ -228,7 +229,7 @@ pub fn skip_whitespace_and_comments(p: &mut Parser<'_>) {
                 continue;
             }
             ';' => {
-                while p.current() != '\n' {
+                while p.current() != '\n' && p.current() != '\0' {
                     p.advance();
                 }
             }

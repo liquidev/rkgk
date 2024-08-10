@@ -9,6 +9,10 @@ log = "0.4.22"
 [profile.wasm-dev]
 inherits = "dev"
 panic = "abort"
+opt-level = 1
+
+[profile.wasm-dev.package.tiny-skia]
+opt-level = 3
 
 [profile.wasm-release]
 inherits = "release"

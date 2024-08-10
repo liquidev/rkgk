@@ -1,66 +1,38 @@
-use core::iter;
-
 use alloc::vec::Vec;
+use tiny_skia::{
+    BlendMode, Color, LineCap, Paint, PathBuilder, Pixmap, Shader, Stroke as SStroke, Transform,
+};
 
 use crate::{
-    value::{Ref, Rgba, Scribble, Shape, Stroke, Value, Vec4},
+    value::{Ref, Rgba, Scribble, Shape, Stroke, Value},
     vm::{Exception, Vm},
 };
 
-pub struct Bitmap {
-    pub width: u32,
-    pub height: u32,
-    pub pixels: Vec<Rgba>,
-}
-
-impl Bitmap {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            width,
-            height,
-            pixels: Vec::from_iter(
-                iter::repeat(Rgba::default()).take(width as usize * height as usize),
-            ),
-        }
-    }
-
-    pub fn pixel_index(&self, x: u32, y: u32) -> usize {
-        x as usize + y as usize * self.width as usize
-    }
-
-    pub fn get(&self, x: u32, y: u32) -> Rgba {
-        self.pixels[self.pixel_index(x, y)]
-    }
-
-    pub fn set(&mut self, x: u32, y: u32, rgba: Rgba) {
-        let index = self.pixel_index(x, y);
-        self.pixels[index] = rgba;
-    }
-}
+pub use tiny_skia;
 
 pub struct RendererLimits {
-    pub bitmap_stack_capacity: usize,
+    pub pixmap_stack_capacity: usize,
     pub transform_stack_capacity: usize,
 }
 
 pub struct Renderer {
-    bitmap_stack: Vec<Bitmap>,
-    transform_stack: Vec<Vec4>,
+    pixmap_stack: Vec<Pixmap>,
+    transform_stack: Vec<Transform>,
 }
 
 impl Renderer {
-    pub fn new(bitmap: Bitmap, limits: &RendererLimits) -> Self {
-        assert!(limits.bitmap_stack_capacity > 0);
+    pub fn new(pixmap: Pixmap, limits: &RendererLimits) -> Self {
+        assert!(limits.pixmap_stack_capacity > 0);
         assert!(limits.transform_stack_capacity > 0);
 
-        let mut blend_stack = Vec::with_capacity(limits.bitmap_stack_capacity);
-        blend_stack.push(bitmap);
+        let mut blend_stack = Vec::with_capacity(limits.pixmap_stack_capacity);
+        blend_stack.push(pixmap);
 
         let mut transform_stack = Vec::with_capacity(limits.transform_stack_capacity);
-        transform_stack.push(Vec4::default());
+        transform_stack.push(Transform::identity());
 
         Self {
-            bitmap_stack: blend_stack,
+            pixmap_stack: blend_stack,
             transform_stack,
         }
     }
@@ -69,44 +41,21 @@ impl Renderer {
         Exception { message }
     }
 
-    fn transform(&self) -> &Vec4 {
-        self.transform_stack.last().unwrap()
+    fn transform(&self) -> Transform {
+        self.transform_stack.last().copied().unwrap()
     }
 
-    fn transform_mut(&mut self) -> &mut Vec4 {
+    fn transform_mut(&mut self) -> &mut Transform {
         self.transform_stack.last_mut().unwrap()
     }
 
-    fn bitmap(&self) -> &Bitmap {
-        self.bitmap_stack.last().unwrap()
+    pub fn translate(&mut self, x: f32, y: f32) {
+        let translated = self.transform().post_translate(x, y);
+        *self.transform_mut() = translated;
     }
 
-    fn bitmap_mut(&mut self) -> &mut Bitmap {
-        self.bitmap_stack.last_mut().unwrap()
-    }
-
-    pub fn translate(&mut self, translation: Vec4) {
-        let transform = self.transform_mut();
-        transform.x += translation.x;
-        transform.y += translation.y;
-        transform.z += translation.z;
-        transform.w += translation.w;
-    }
-
-    pub fn to_bitmap_coords(&self, point: Vec4) -> Option<(u32, u32)> {
-        let transform = self.transform();
-        let x = point.x + transform.x;
-        let y = point.y + transform.y;
-        if x >= 0.0 && y >= 0.0 {
-            let (x, y) = (x as u32, y as u32);
-            if x < self.bitmap().width && y < self.bitmap().height {
-                Some((x, y))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    fn pixmap_mut(&mut self) -> &mut Pixmap {
+        self.pixmap_stack.last_mut().unwrap()
     }
 
     pub fn render(&mut self, vm: &Vm, value: Value) -> Result<(), Exception> {
@@ -126,19 +75,75 @@ impl Renderer {
     }
 
     fn render_stroke(&mut self, _vm: &Vm, _value: Value, stroke: &Stroke) -> Result<(), Exception> {
+        let paint = Paint {
+            shader: Shader::SolidColor(tiny_skia_color(stroke.color)),
+            ..default_paint()
+        };
+        let transform = self.transform();
+
         match stroke.shape {
             Shape::Point(vec) => {
-                if let Some((x, y)) = self.to_bitmap_coords(vec) {
-                    // TODO: thickness
-                    self.bitmap_mut().set(x, y, stroke.color);
-                }
+                let mut pb = PathBuilder::new();
+                pb.move_to(vec.x, vec.y);
+                pb.line_to(vec.x, vec.y);
+                let path = pb.finish().unwrap();
+
+                self.pixmap_mut().stroke_path(
+                    &path,
+                    &paint,
+                    &SStroke {
+                        width: stroke.thickness,
+                        line_cap: LineCap::Square,
+                        ..Default::default()
+                    },
+                    transform,
+                    None,
+                );
+            }
+
+            Shape::Line(start, end) => {
+                let mut pb = PathBuilder::new();
+                pb.move_to(start.x, start.y);
+                pb.line_to(end.x, end.y);
+                let path = pb.finish().unwrap();
+
+                self.pixmap_mut().stroke_path(
+                    &path,
+                    &paint,
+                    &SStroke {
+                        width: stroke.thickness,
+                        line_cap: LineCap::Square,
+                        ..Default::default()
+                    },
+                    transform,
+                    None,
+                );
             }
         }
 
         Ok(())
     }
 
-    pub fn finish(mut self) -> Bitmap {
-        self.bitmap_stack.drain(..).next().unwrap()
+    pub fn finish(mut self) -> Pixmap {
+        self.pixmap_stack.drain(..).next().unwrap()
     }
+}
+
+fn default_paint() -> Paint<'static> {
+    Paint {
+        shader: Shader::SolidColor(Color::BLACK),
+        blend_mode: BlendMode::SourceOver,
+        anti_alias: false,
+        force_hq_pipeline: false,
+    }
+}
+
+fn tiny_skia_color(color: Rgba) -> Color {
+    Color::from_rgba(
+        color.r.clamp(0.0, 1.0),
+        color.g.clamp(0.0, 1.0),
+        color.b.clamp(0.0, 1.0),
+        color.a.clamp(0.0, 1.0),
+    )
+    .unwrap()
 }

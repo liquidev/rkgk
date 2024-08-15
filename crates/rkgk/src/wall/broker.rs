@@ -6,7 +6,7 @@ use rand_chacha::ChaCha20Rng;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use super::{Settings, Wall, WallId};
+use super::{chunk_encoder::ChunkEncoder, Settings, Wall, WallId};
 
 /// The broker is the main way to access wall data.
 ///
@@ -18,8 +18,10 @@ pub struct Broker {
     rng: Mutex<ChaCha20Rng>,
 }
 
-struct OpenWall {
-    wall: Arc<Wall>,
+#[derive(Clone)]
+pub struct OpenWall {
+    pub wall: Arc<Wall>,
+    pub chunk_encoder: Arc<ChunkEncoder>,
 }
 
 impl Broker {
@@ -39,15 +41,14 @@ impl Broker {
         WallId::new(&mut *rng)
     }
 
-    pub fn open(&self, wall_id: WallId) -> Arc<Wall> {
-        Arc::clone(
-            &self
-                .open_walls
-                .entry(wall_id)
-                .or_insert_with(|| OpenWall {
-                    wall: Arc::new(Wall::new(self.wall_settings)),
-                })
-                .wall,
-        )
+    pub fn open(&self, wall_id: WallId) -> OpenWall {
+        let wall = Arc::new(Wall::new(self.wall_settings));
+        self.open_walls
+            .entry(wall_id)
+            .or_insert_with(|| OpenWall {
+                chunk_encoder: Arc::new(ChunkEncoder::start(Arc::clone(&wall))),
+                wall,
+            })
+            .clone()
     }
 }

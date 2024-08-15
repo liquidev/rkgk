@@ -1,0 +1,52 @@
+# haku
+
+Haku is a little scripting language used by rakugaki for programming brushes.
+Here's a brief tour of the language.
+
+## Your brush
+
+Your brush is a piece of code that describes what's to be drawn on the wall.
+
+For example:
+
+```haku
+(stroke
+	8
+	(rgba 0 0 0 1)
+	(vec 0 0))
+```
+
+This is the simplest brush you can write.
+It demonstrates a few things:
+
+- The brush's task is to produce a description of what's to be drawn.
+Brushes produce *scribbles* - commands that instruct rakugaki draw something on the wall.
+
+    - This brush produces the `(stroke)` scribble.
+    This scribble is composed out of three things:
+
+        - The stroke thickness - in this case `8`.
+        - The stroke color - in this case `(rgba 0 0 0 1)`.
+        Note that unlike most drawing programs, rakugaki brushes represent color channels with decimal numbers from 0 to 1, rather than integers from 0 to 255.
+        - The shape to draw - in this case a `(vec 0 0)`.
+
+            - Vectors are aggregations of four generic decimal numbers, most often used to represent positions in the wall's Cartesian coordinate space.
+            Although vectors are mathematically not the same as points, brushes always execute in a coordinate space relative to where you want to draw with the brush, so a separate `(point)` type isn't needed.
+
+            - Vectors in haku are four-dimensional, but the wall is two-dimensional, so the extra dimensions are discarded when drawing to the wall.
+            
+            - haku permits constructing vectors from zero two four values - from `(vec)`, up to `(vec x y w h)`.
+            Any values that you leave out end up being zero.
+
+    - Note that a brush can only produce *one* scribble - this is because scribbles may be composed together using lists (described later.)
+
+I highly recommend that you play around with the brush to get a feel for editing haku code!
+
+## Limits
+
+The wall is infinite, but your brush may only draw in a small area around your cursor (~500 pixels.)
+Drawing outside this area may result in pixels getting dropped in ugly ways, but it can also be used to your advantage in order to produce cool glitch art.
+
+Additionally, haku code has some pretty strong limitations on what it can do.
+It cannot be too big, it cannot execute for too long, and it cannot consume too much memory.
+It does not have access to the world outside the wall.

@@ -1,5 +1,76 @@
 [wall]
+
+# The settings below control the creation of new walls.
+
+# The maximum number of chunks on a wall.
+# It is recommended to cap this to something reasonable so that users can't trash the server's
+# disk space very easily.
 max_chunks = 65536
+
+# Maximum concurrent sessions connected to a wall.
+# Note that a single user can have multiple sessions at a time.
 max_sessions = 128
+
+# The size of chunks.
+# Choosing an appropriate size for chunks is a tradeoff between performance and disk space - 168 is
+# chosen as a reasonable default 
 chunk_size = 168
+
+# The size of the area that can be drawn over by a brush, in pixels.
+# The larger this area, the more CPU-expensive brushes get overall, but the larger the image a brush
+# can produce.
+paint_area = 504
+
+[haku]
+
+# The settings below control the Haku runtime on the server side.
+# Technically clients may override these settings with some hackery, but then the server may not
+# register changes they make to the canvas.
+
+# Maximum amount of source code chunks.
+# This should be at least 2, to allow for loading in a standard library chunk.
+max_chunks = 2
+
+# Maximum amount of defs across all source code chunks.
+max_defs = 256
+
+# Maximum amount of AST nodes in a single parse.
+ast_capacity = 1024
+
+# Maximum size of a bytecode chunk.
+# This must be <= 65536 due to bytecode limitations - offsets are stored as 16-bit integers.
+chunk_capacity = 65536
+
+# Maximum size of the value stack.
+# This defines how many local variables and temporary values can be in scope at a given moment.
+# Effectively, this limits how deep and complex a single expression can get.
+stack_capacity = 1024
+
+# Maximum call stack capacity.
+# This defines how much code is allowed to call itself recursively.
+call_stack_capacity = 256
+
+# Maximum amount of refs.
+# Refs are big, reused, unique values that do not fit on the value stack - akin to objects in
+# languages like Python, but immutable.
+ref_capacity = 2048
+
+# Amount of fuel given to the VM.
+# Each instruction executed by the VM consumes fuel. The VM will continue running until it runs out
+# of fuel completely.
+# An unfortunate side effect of this is that since Haku is a functional language, a brush running
+# out of fuel means it will not be rendered at all, because there is no complete value returned.
+fuel = 65536
+
+# Capacity of the renderer's pixmap stack.
+# The pixmap stack is used for blending layers together within a brush.
+# Each (composite)-type scribble requires a single entry on this pixmap stack.
+# In the end, this defines how deep compositing operations may nest.
+pixmap_stack_capacity = 4
+
+# Capacity of the renderer's transformation stack.
+# The transformation stack is used for operations on the transform matrix, such as (translate).
+# To render each transformed operation, a single entry of the transform stack is used.
+# In the end, this defines how deep matrix transform operations may nest.
+transform_stack_capacity = 16
 

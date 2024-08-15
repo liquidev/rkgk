@@ -5,6 +5,10 @@ members = ["crates/*"]
 [workspace.dependencies]
 haku.path = "crates/haku"
 log = "0.4.22"
+rkgk-image-ops.path = "crates/rkgk-image-ops"
+
+[profile.dev.package.rkgk-image-ops]
+opt-level = 3
 
 [profile.wasm-dev]
 inherits = "dev"

@@ -9,15 +9,20 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::Databases;
+use crate::{config::Config, Databases};
 
 mod wall;
 
-pub fn router<S>(dbs: Arc<Databases>) -> Router<S> {
+pub struct Api {
+    pub config: Config,
+    pub dbs: Arc<Databases>,
+}
+
+pub fn router<S>(api: Arc<Api>) -> Router<S> {
     Router::new()
         .route("/login", post(login_new))
         .route("/wall", get(wall::wall))
-        .with_state(dbs)
+        .with_state(api)
 }
 
 #[derive(Deserialize)]
@@ -35,7 +40,7 @@ enum NewUserResponse {
     Error { message: String },
 }
 
-async fn login_new(dbs: State<Arc<Databases>>, params: Json<NewUserParams>) -> impl IntoResponse {
+async fn login_new(api: State<Arc<Api>>, params: Json<NewUserParams>) -> impl IntoResponse {
     if !(1..=32).contains(&params.nickname.len()) {
         return (
             StatusCode::BAD_REQUEST,
@@ -45,7 +50,7 @@ async fn login_new(dbs: State<Arc<Databases>>, params: Json<NewUserParams>) -> i
         );
     }
 
-    match dbs.login.new_user(params.0.nickname).await {
+    match api.dbs.login.new_user(params.0.nickname).await {
         Ok(user_id) => (
             StatusCode::OK,
             Json(NewUserResponse::Ok {

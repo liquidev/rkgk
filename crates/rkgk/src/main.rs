@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use api::Api;
 use axum::Router;
 use config::Config;
 use copy_dir::copy_dir;
@@ -16,6 +17,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 mod api;
 mod binary;
 mod config;
+mod haku;
 mod id;
 #[cfg(debug_assertions)]
 mod live_reload;
@@ -23,6 +25,11 @@ mod login;
 pub mod schema;
 mod serialization;
 mod wall;
+
+#[cfg(feature = "memory-profiling")]
+#[global_allocator]
+static GLOBAL_ALLOCATOR: tracy_client::ProfiledAllocator<std::alloc::System> =
+    tracy_client::ProfiledAllocator::new(std::alloc::System, 100);
 
 struct Paths<'a> {
     target_dir: &'a Path,
@@ -81,13 +88,15 @@ async fn fallible_main() -> eyre::Result<()> {
     build(&paths)?;
     let dbs = Arc::new(database(&config, &paths)?);
 
+    let api = Arc::new(Api { config, dbs });
+
     let app = Router::new()
         .route_service(
             "/",
             ServeFile::new(paths.target_dir.join("static/index.html")),
         )
         .nest_service("/static", ServeDir::new(paths.target_dir.join("static")))
-        .nest("/api", api::router(dbs.clone()));
+        .nest("/api", api::router(api));
 
     #[cfg(debug_assertions)]
     let app = app.nest("/dev/live-reload", live_reload::router());
@@ -103,6 +112,9 @@ async fn fallible_main() -> eyre::Result<()> {
 
 #[tokio::main]
 async fn main() {
+    #[cfg(feature = "memory-profiling")]
+    let _client = tracy_client::Client::start();
+
     color_eyre::install().unwrap();
     tracing_subscriber::fmt()
         .with_span_events(FmtSpan::ACTIVE)

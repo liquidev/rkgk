@@ -11,4 +11,5 @@ arrayvec = { version = "0.7.4", default-features = false }
 dlmalloc = { version = "0.2.6", features = ["global"] }
 haku.workspace = true
 log.workspace = true
+paste = "1.0.15"
 

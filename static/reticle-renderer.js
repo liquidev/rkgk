@@ -1,7 +1,10 @@
 export class Reticle extends HTMLElement {
-    #kind = null;
-    #data = {};
+    render(_viewport, _windowSize) {
+        throw new Error("Reticle.render must be overridden");
+    }
+}
 
+export class ReticleCursor extends Reticle {
     #container;
 
     constructor(nickname) {
@@ -14,84 +17,60 @@ export class Reticle extends HTMLElement {
 
         this.#container = this.appendChild(document.createElement("div"));
         this.#container.classList.add("container");
+
+        this.classList.add("cursor");
+
+        let arrow = this.#container.appendChild(document.createElement("div"));
+        arrow.classList.add("arrow");
+
+        let nickname = this.#container.appendChild(document.createElement("div"));
+        nickname.classList.add("nickname");
+        nickname.textContent = this.nickname;
     }
 
     getColor() {
-        let hash = 5381;
+        let hash = 8803;
         for (let i = 0; i < this.nickname.length; ++i) {
-            hash <<= 5;
-            hash += hash;
-            hash += this.nickname.charCodeAt(i);
-            hash &= 0xffff;
+            hash = (hash << 5) - hash + this.nickname.charCodeAt(i);
+            hash |= 0;
         }
-        return `oklch(70% 0.2 ${(hash / 0xffff) * 360}deg)`;
-    }
-
-    #update(kind, data) {
-        this.#data = data;
-
-        if (kind != this.#kind) {
-            this.classList = "";
-            this.#container.replaceChildren();
-            this.#kind = kind;
-        }
-
-        this.dispatchEvent(new Event(".update"));
+        return `oklch(65% 0.2 ${(hash / 0xffff) * 360}deg)`;
     }
 
     setCursor(x, y) {
-        this.#update("cursor", { x, y });
+        this.x = x;
+        this.y = y;
+        this.dispatchEvent(new Event(".update"));
     }
 
     render(viewport, windowSize) {
-        if (!this.rendered) {
-            if (this.#kind == "cursor") {
-                this.classList.add("cursor");
-
-                let arrow = this.#container.appendChild(document.createElement("div"));
-                arrow.classList.add("arrow");
-
-                let nickname = this.#container.appendChild(document.createElement("div"));
-                nickname.classList.add("nickname");
-                nickname.textContent = this.nickname;
-            }
-        }
-
-        if (this.#kind == "cursor") {
-            let { x, y } = this.#data;
-            let [viewportX, viewportY] = viewport.toScreenSpace(x, y, windowSize);
-            this.style.transform = `translate(${viewportX}px, ${viewportY}px)`;
-        }
-
-        this.rendered = true;
+        let [viewportX, viewportY] = viewport.toScreenSpace(this.x, this.y, windowSize);
+        this.style.transform = `translate(${viewportX}px, ${viewportY}px)`;
     }
 }
 
-customElements.define("rkgk-reticle", Reticle);
+customElements.define("rkgk-reticle-cursor", ReticleCursor);
 
 export class ReticleRenderer extends HTMLElement {
-    #reticles = new Map();
+    #reticles = new Set();
     #reticlesDiv;
 
     connectedCallback() {
         this.#reticlesDiv = this.appendChild(document.createElement("div"));
         this.#reticlesDiv.classList.add("reticles");
 
-        this.updateTransform();
-        let resizeObserver = new ResizeObserver(() => this.updateTransform());
+        this.render();
+        let resizeObserver = new ResizeObserver(() => this.render());
         resizeObserver.observe(this);
     }
 
     connectViewport(viewport) {
         this.viewport = viewport;
-        this.updateTransform();
+        this.render();
     }
 
-    getOrAddReticle(onlineUsers, sessionId) {
-        if (this.#reticles.has(sessionId)) {
-            return this.#reticles.get(sessionId);
-        } else {
-            let reticle = new Reticle(onlineUsers.getUser(sessionId).nickname);
+    addReticle(reticle) {
+        if (!this.#reticles.has(reticle)) {
             reticle.addEventListener(".update", () => {
                 if (this.viewport != null) {
                     reticle.render(this.viewport, {
@@ -100,28 +79,26 @@ export class ReticleRenderer extends HTMLElement {
                     });
                 }
             });
-            this.#reticles.set(sessionId, reticle);
+            this.#reticles.add(reticle);
             this.#reticlesDiv.appendChild(reticle);
-            return reticle;
         }
     }
 
-    removeReticle(sessionId) {
-        if (this.#reticles.has(sessionId)) {
-            let reticle = this.#reticles.get(sessionId);
-            this.#reticles.delete(sessionId);
+    removeReticle(reticle) {
+        if (this.#reticles.has(reticle)) {
+            this.#reticles.delete(reticle);
             this.#reticlesDiv.removeChild(reticle);
         }
     }
 
-    updateTransform() {
+    render() {
         if (this.viewport == null) {
             console.debug("viewport is disconnected, skipping transform update");
             return;
         }
 
         let windowSize = { width: this.clientWidth, height: this.clientHeight };
-        for (let [_, reticle] of this.#reticles) {
+        for (let reticle of this.#reticles.values()) {
             reticle.render(this.viewport, windowSize);
         }
     }

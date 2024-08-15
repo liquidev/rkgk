@@ -13,10 +13,13 @@ use haku::render::tiny_skia::Pixmap;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex};
+use tracing::info;
 
 use crate::{id, login::UserId, schema::Vec2, serialization::DeserializeFromStr};
 
 pub mod broker;
+pub mod chunk_encoder;
+pub mod chunk_iterator;
 
 pub use broker::Broker;
 
@@ -79,8 +82,20 @@ impl fmt::Display for InvalidWallId {
 
 impl Error for InvalidWallId {}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct ChunkPosition {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl ChunkPosition {
+    pub fn new(x: i32, y: i32) -> Self {
+        Self { x, y }
+    }
+}
+
 pub struct Chunk {
-    pixmap: Pixmap,
+    pub pixmap: Pixmap,
 }
 
 impl Chunk {
@@ -95,13 +110,23 @@ impl Chunk {
 pub struct Settings {
     pub max_chunks: usize,
     pub max_sessions: usize,
+    pub paint_area: u32,
     pub chunk_size: u32,
+}
+
+impl Settings {
+    pub fn chunk_at(&self, position: Vec2) -> ChunkPosition {
+        ChunkPosition::new(
+            f32::floor(position.x / self.chunk_size as f32) as i32,
+            f32::floor(position.y / self.chunk_size as f32) as i32,
+        )
+    }
 }
 
 pub struct Wall {
     settings: Settings,
 
-    chunks: DashMap<(i32, i32), Arc<Mutex<Chunk>>>,
+    chunks: DashMap<ChunkPosition, Arc<Mutex<Chunk>>>,
 
     sessions: DashMap<SessionId, Session>,
     session_id_counter: AtomicU32,
@@ -109,9 +134,17 @@ pub struct Wall {
     event_sender: broadcast::Sender<Event>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserInit {
+    // Provide a brush upon initialization, so that the user always has a valid brush set.
+    pub brush: String,
+}
+
 pub struct Session {
     pub user_id: UserId,
     pub cursor: Option<Vec2>,
+    pub brush: String,
 }
 
 pub struct SessionHandle {
@@ -134,6 +167,9 @@ pub struct Event {
     rename_all_fields = "camelCase"
 )]
 pub enum EventKind {
+    Join { nickname: String, init: UserInit },
+    Leave,
+
     Cursor { position: Vec2 },
 
     SetBrush { brush: String },
@@ -146,6 +182,7 @@ pub struct Online {
     pub session_id: SessionId,
     pub user_id: UserId,
     pub cursor: Option<Vec2>,
+    pub brush: String,
 }
 
 impl Wall {
@@ -163,11 +200,11 @@ impl Wall {
         &self.settings
     }
 
-    pub fn get_chunk(&self, at: (i32, i32)) -> Option<Arc<Mutex<Chunk>>> {
+    pub fn get_chunk(&self, at: ChunkPosition) -> Option<Arc<Mutex<Chunk>>> {
         self.chunks.get(&at).map(|chunk| Arc::clone(&chunk))
     }
 
-    pub fn get_or_create_chunk(&self, at: (i32, i32)) -> Arc<Mutex<Chunk>> {
+    pub fn get_or_create_chunk(&self, at: ChunkPosition) -> Arc<Mutex<Chunk>> {
         Arc::clone(
             &self
                 .chunks
@@ -198,6 +235,7 @@ impl Wall {
                 session_id: *r.key(),
                 user_id: r.user_id,
                 cursor: r.value().cursor,
+                brush: r.value().brush.clone(),
             })
             .collect()
     }
@@ -205,12 +243,17 @@ impl Wall {
     pub fn event(&self, event: Event) {
         if let Some(mut session) = self.sessions.get_mut(&event.session_id) {
             match &event.kind {
-                EventKind::SetBrush { brush } => {}
+                // Join and Leave are events that only get broadcasted through the wall such that
+                // all users get them. We don't need to react to them in any way.
+                EventKind::Join { .. } | EventKind::Leave => (),
 
                 EventKind::Cursor { position } => {
                     session.cursor = Some(*position);
                 }
-                EventKind::Plot { points } => {}
+
+                // Drawing events are handled by the owner session's thread to make drawing as
+                // parallel as possible.
+                EventKind::SetBrush { .. } | EventKind::Plot { .. } => (),
             }
         }
 
@@ -219,10 +262,11 @@ impl Wall {
 }
 
 impl Session {
-    pub fn new(user_id: UserId) -> Self {
+    pub fn new(user_id: UserId, user_init: UserInit) -> Self {
         Self {
             user_id,
             cursor: None,
+            brush: user_init.brush,
         }
     }
 }
@@ -231,6 +275,10 @@ impl Drop for SessionHandle {
     fn drop(&mut self) {
         if let Some(wall) = self.wall.upgrade() {
             wall.sessions.remove(&self.session_id);
+            wall.event(Event {
+                session_id: self.session_id,
+                kind: EventKind::Leave,
+            });
             // After the session is removed, the wall will be garbage collected later.
         }
     }
@@ -239,8 +287,4 @@ impl Drop for SessionHandle {
 pub enum JoinError {
     TooManyCurrentSessions,
     IdsExhausted,
-}
-
-pub enum EventError {
-    DeadSession,
 }

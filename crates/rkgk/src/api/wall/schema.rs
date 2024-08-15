@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     login::UserId,
     schema::Vec2,
-    wall::{self, SessionId, WallId},
+    wall::{self, ChunkPosition, SessionId, UserInit, WallId},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -19,23 +19,12 @@ pub struct Error {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(
-    tag = "login",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-pub enum LoginRequest {
-    New { user: UserId },
-    Join { user: UserId, wall: WallId },
-}
-
-impl LoginRequest {
-    pub fn user_id(&self) -> &UserId {
-        match self {
-            LoginRequest::New { user } => user,
-            LoginRequest::Join { user, .. } => user,
-        }
-    }
+#[serde(rename_all = "camelCase")]
+pub struct LoginRequest {
+    pub user: UserId,
+    /// If null, a new wall is created.
+    pub wall: Option<WallId>,
+    pub init: UserInit,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -44,12 +33,15 @@ pub struct Online {
     pub session_id: SessionId,
     pub nickname: String,
     pub cursor: Option<Vec2>,
+    pub init: UserInit,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WallInfo {
     pub chunk_size: u32,
+    pub paint_area: u32,
+    pub haku_limits: crate::haku::Limits,
     pub online: Vec<Online>,
 }
 
@@ -67,4 +59,41 @@ pub enum LoginResponse {
     },
     UserDoesNotExist,
     TooManySessions,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(
+    tag = "request",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum Request {
+    Wall {
+        wall_event: wall::EventKind,
+    },
+
+    Viewport {
+        top_left: ChunkPosition,
+        bottom_right: ChunkPosition,
+    },
+
+    MoreChunks,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChunkInfo {
+    pub position: ChunkPosition,
+    pub offset: u32,
+    pub length: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(
+    tag = "notify",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum Notify {
+    Wall { wall_event: wall::Event },
+    Chunks { chunks: Vec<ChunkInfo> },
 }

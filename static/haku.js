@@ -118,9 +118,16 @@ export class Haku {
     #pBrush = 0;
     #brushCode = null;
 
-    constructor() {
-        this.#pInstance = w.haku_instance_new();
+    constructor(limits) {
+        let pLimits = w.haku_limits_new();
+        for (let name of Object.keys(limits)) {
+            w[`haku_limits_set_${name}`](pLimits, limits[name]);
+        }
+
+        this.#pInstance = w.haku_instance_new(pLimits);
         this.#pBrush = w.haku_brush_new();
+
+        w.haku_limits_destroy(pLimits);
     }
 
     setBrush(code) {
@@ -166,18 +173,7 @@ export class Haku {
         return { status: "ok" };
     }
 
-    renderBrush(pixmap, translationX, translationY) {
-        let statusCode = w.haku_render_brush(
-            this.#pInstance,
-            this.#pBrush,
-            pixmap.ptr,
-            // If we ever want to detect which pixels were touched (USING A SHADER.), we can use
-            // this to rasterize the brush _twice_, and then we can detect which pixels are the same
-            // between the two pixmaps.
-            0,
-            translationX,
-            translationY,
-        );
+    #statusCodeToResultObject(statusCode) {
         if (!w.haku_is_ok(statusCode)) {
             if (w.haku_is_exception(statusCode)) {
                 return {
@@ -196,8 +192,22 @@ export class Haku {
                     message: readCString(w.haku_status_string(statusCode)),
                 };
             }
+        } else {
+            return { status: "ok" };
         }
+    }
 
-        return { status: "ok" };
+    evalBrush() {
+        return this.#statusCodeToResultObject(w.haku_eval_brush(this.#pInstance, this.#pBrush));
+    }
+
+    renderValue(pixmap, translationX, translationY) {
+        return this.#statusCodeToResultObject(
+            w.haku_render_value(this.#pInstance, pixmap.ptr, translationX, translationY),
+        );
+    }
+
+    resetVm() {
+        w.haku_reset_vm(this.#pInstance);
     }
 }

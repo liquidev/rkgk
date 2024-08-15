@@ -34,11 +34,31 @@ class CanvasRenderer extends HTMLElement {
         this.#render();
     }
 
+    getWindowSize() {
+        return {
+            width: this.clientWidth,
+            height: this.clientHeight,
+        };
+    }
+
     #render() {
         // NOTE: We should probably render on-demand only when it's needed.
         requestAnimationFrame(() => this.#render());
 
         this.#renderWall();
+    }
+
+    getVisibleRect() {
+        return this.viewport.getVisibleRect(this.getWindowSize());
+    }
+
+    getVisibleChunkRect() {
+        let visibleRect = this.viewport.getVisibleRect(this.getWindowSize());
+        let left = Math.floor(visibleRect.x / this.wall.chunkSize);
+        let top = Math.floor(visibleRect.y / this.wall.chunkSize);
+        let right = Math.ceil((visibleRect.x + visibleRect.width) / this.wall.chunkSize);
+        let bottom = Math.ceil((visibleRect.y + visibleRect.height) / this.wall.chunkSize);
+        return { left, top, right, bottom };
     }
 
     #renderWall() {
@@ -55,10 +75,7 @@ class CanvasRenderer extends HTMLElement {
         this.ctx.scale(this.viewport.zoom, this.viewport.zoom);
         this.ctx.translate(-this.viewport.panX, -this.viewport.panY);
 
-        let visibleRect = this.viewport.getVisibleRect({
-            width: this.clientWidth,
-            height: this.clientHeight,
-        });
+        let visibleRect = this.viewport.getVisibleRect(this.getWindowSize());
         let left = Math.floor(visibleRect.x / this.wall.chunkSize);
         let top = Math.floor(visibleRect.y / this.wall.chunkSize);
         let right = Math.ceil((visibleRect.x + visibleRect.width) / this.wall.chunkSize);
@@ -88,10 +105,7 @@ class CanvasRenderer extends HTMLElement {
             let [x, y] = this.viewport.toViewportSpace(
                 event.clientX - this.clientLeft,
                 event.offsetY - this.clientTop,
-                {
-                    width: this.clientWidth,
-                    height: this.clientHeight,
-                },
+                this.getWindowSize(),
             );
             this.dispatchEvent(Object.assign(new Event(".cursor"), { x, y }));
         }
@@ -127,10 +141,7 @@ class CanvasRenderer extends HTMLElement {
 
     async #paintingBehaviour() {
         const paint = (x, y) => {
-            let [wallX, wallY] = this.viewport.toViewportSpace(x, y, {
-                width: this.clientWidth,
-                height: this.clientHeight,
-            });
+            let [wallX, wallY] = this.viewport.toViewportSpace(x, y, this.getWindowSize());
             this.dispatchEvent(Object.assign(new Event(".paint"), { x: wallX, y: wallY }));
         };
 

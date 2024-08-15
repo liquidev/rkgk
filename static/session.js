@@ -85,8 +85,16 @@ class Session extends EventTarget {
         }
     }
 
+    async #recvBinary() {
+        let event = await listen([this.ws, "message"]);
+        if (event.data instanceof Blob) {
+            return event.data;
+        } else {
+            throw new Error("received a text message where a binary message was expected");
+        }
+    }
+
     #sendJson(object) {
-        console.debug("sendJson", object);
         this.ws.send(JSON.stringify(object));
     }
 
@@ -100,7 +108,7 @@ class Session extends EventTarget {
         );
     }
 
-    async join(wallId) {
+    async join(wallId, userInit) {
         console.info("joining wall", wallId);
         this.wallId = wallId;
 
@@ -123,22 +131,32 @@ class Session extends EventTarget {
 
         try {
             await listen([this.ws, "open"]);
-            await this.joinInner();
+            await this.joinInner(wallId, userInit);
         } catch (error) {
             this.#dispatchError(error, "connection", `communication failed: ${error.toString()}`);
         }
     }
 
-    async joinInner() {
+    async joinInner(wallId, userInit) {
         let version = await this.#recvJson();
         console.info("protocol version", version.version);
         // TODO: This should probably verify that the version is compatible.
         // We don't have a way of sending Rust stuff to JavaScript just yet, so we don't care about it.
 
+        let init = {
+            brush: userInit.brush,
+        };
         if (this.wallId == null) {
-            this.#sendJson({ login: "new", user: this.userId });
+            this.#sendJson({
+                user: this.userId,
+                init,
+            });
         } else {
-            this.#sendJson({ login: "join", user: this.userId, wall: this.wallId });
+            this.#sendJson({
+                user: this.userId,
+                wall: wallId,
+                init,
+            });
         }
 
         let loginResponse = await this.#recvJson();
@@ -164,9 +182,9 @@ class Session extends EventTarget {
             while (true) {
                 let event = await listen([this.ws, "message"]);
                 if (typeof event.data == "string") {
-                    await this.#processEvent(JSON.parse(event.data));
+                    await this.#processNotify(JSON.parse(event.data));
                 } else {
-                    console.warn("binary event not yet supported");
+                    console.warn("unhandled binary event", event.data);
                 }
             }
         } catch (error) {
@@ -174,27 +192,74 @@ class Session extends EventTarget {
         }
     }
 
-    async #processEvent(event) {
-        if (event.kind != null) {
+    async #processNotify(notify) {
+        if (notify.notify == "wall") {
             this.dispatchEvent(
-                Object.assign(new Event("action"), {
-                    sessionId: event.sessionId,
-                    kind: event.kind,
+                Object.assign(new Event("wallEvent"), {
+                    sessionId: notify.sessionId,
+                    wallEvent: notify.wallEvent,
+                }),
+            );
+        }
+
+        if (notify.notify == "chunks") {
+            let chunkData = await this.#recvBinary();
+            this.dispatchEvent(
+                Object.assign(new Event("chunks"), {
+                    chunkInfo: notify.chunks,
+                    chunkData,
                 }),
             );
         }
     }
 
-    async reportCursor(x, y) {
+    sendCursor(x, y) {
         this.#sendJson({
-            event: "cursor",
-            position: { x, y },
+            request: "wall",
+            wallEvent: {
+                event: "cursor",
+                position: { x, y },
+            },
+        });
+    }
+
+    sendPlot(points) {
+        this.#sendJson({
+            request: "wall",
+            wallEvent: {
+                event: "plot",
+                points,
+            },
+        });
+    }
+
+    sendSetBrush(brush) {
+        this.#sendJson({
+            request: "wall",
+            wallEvent: {
+                event: "setBrush",
+                brush,
+            },
+        });
+    }
+
+    sendViewport({ left, top, right, bottom }) {
+        this.#sendJson({
+            request: "viewport",
+            topLeft: { x: left, y: top },
+            bottomRight: { x: right, y: bottom },
+        });
+    }
+
+    sendMoreChunks() {
+        this.#sendJson({
+            request: "moreChunks",
         });
     }
 }
 
-export async function newSession(userId, wallId) {
+export async function newSession(userId, wallId, userInit) {
     let session = new Session(userId);
-    await session.join(wallId);
+    await session.join(wallId, userInit);
     return session;
 }

@@ -1,22 +1,36 @@
-import { Pixmap } from "./haku.js";
-
 export class Painter {
-    #pixmap;
-    imageBitmap;
-
     constructor(paintArea) {
         this.paintArea = paintArea;
-        this.#pixmap = new Pixmap(paintArea, paintArea);
     }
 
-    async createImageBitmap() {
-        return await createImageBitmap(this.#pixmap.imageData);
-    }
+    renderBrushToWall(haku, centerX, centerY, wall) {
+        let evalResult = haku.evalBrush();
+        if (evalResult.status != "ok") return evalResult;
 
-    renderBrush(haku) {
-        this.#pixmap.clear(0, 0, 0, 0);
-        let result = haku.renderBrush(this.#pixmap, this.paintArea / 2, this.paintArea / 2);
+        let left = centerX - this.paintArea / 2;
+        let top = centerY - this.paintArea / 2;
 
-        return result;
+        let leftChunk = Math.floor(left / wall.chunkSize);
+        let topChunk = Math.floor(top / wall.chunkSize);
+        let rightChunk = Math.ceil((left + this.paintArea) / wall.chunkSize);
+        let bottomChunk = Math.ceil((top + this.paintArea) / wall.chunkSize);
+        for (let chunkY = topChunk; chunkY < bottomChunk; ++chunkY) {
+            for (let chunkX = leftChunk; chunkX < rightChunk; ++chunkX) {
+                let x = Math.floor(-chunkX * wall.chunkSize + centerX);
+                let y = Math.floor(-chunkY * wall.chunkSize + centerY);
+                let chunk = wall.getOrCreateChunk(chunkX, chunkY);
+
+                let renderResult = haku.renderValue(chunk.pixmap, x, y);
+                if (renderResult.status != "ok") return renderResult;
+            }
+        }
+        haku.resetVm();
+
+        for (let y = topChunk; y < bottomChunk; ++y) {
+            for (let x = leftChunk; x < rightChunk; ++x) {
+                let chunk = wall.getChunk(x, y);
+                chunk.syncFromPixmap();
+            }
+        }
     }
 }

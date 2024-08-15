@@ -15,18 +15,23 @@ pub struct RendererLimits {
     pub transform_stack_capacity: usize,
 }
 
-pub struct Renderer {
-    pixmap_stack: Vec<Pixmap>,
+pub enum RenderTarget<'a> {
+    Borrowed(&'a mut Pixmap),
+    Owned(Pixmap),
+}
+
+pub struct Renderer<'a> {
+    pixmap_stack: Vec<RenderTarget<'a>>,
     transform_stack: Vec<Transform>,
 }
 
-impl Renderer {
-    pub fn new(pixmap: Pixmap, limits: &RendererLimits) -> Self {
+impl<'a> Renderer<'a> {
+    pub fn new(pixmap: &'a mut Pixmap, limits: &RendererLimits) -> Self {
         assert!(limits.pixmap_stack_capacity > 0);
         assert!(limits.transform_stack_capacity > 0);
 
         let mut blend_stack = Vec::with_capacity(limits.pixmap_stack_capacity);
-        blend_stack.push(pixmap);
+        blend_stack.push(RenderTarget::Borrowed(pixmap));
 
         let mut transform_stack = Vec::with_capacity(limits.transform_stack_capacity);
         transform_stack.push(Transform::identity());
@@ -55,7 +60,10 @@ impl Renderer {
     }
 
     fn pixmap_mut(&mut self) -> &mut Pixmap {
-        self.pixmap_stack.last_mut().unwrap()
+        match self.pixmap_stack.last_mut().unwrap() {
+            RenderTarget::Borrowed(pixmap) => pixmap,
+            RenderTarget::Owned(pixmap) => pixmap,
+        }
     }
 
     pub fn render(&mut self, vm: &Vm, value: Value) -> Result<(), Exception> {
@@ -122,10 +130,6 @@ impl Renderer {
         }
 
         Ok(())
-    }
-
-    pub fn finish(mut self) -> Pixmap {
-        self.pixmap_stack.drain(..).next().unwrap()
     }
 }
 

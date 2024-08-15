@@ -178,8 +178,8 @@ rkgk-reticle-renderer {
     }
 }
 
-rkgk-reticle {
-    --color: black;
+rkgk-reticle-cursor {
+    --color: black; /* Overridden by JavaScript to set a per-user color. */
 
     position: absolute;
     display: block;

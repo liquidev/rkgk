@@ -83,53 +83,41 @@ reticleRenderer.connectViewport(canvasRenderer.viewport);
         }
     });
 
-    let pendingChunks = 0;
-    let chunkDownloadStates = new Map();
-
-    function sendViewportUpdate() {
+    let sendViewportUpdate = debounce(updateInterval, () => {
         let visibleRect = canvasRenderer.getVisibleChunkRect();
         session.sendViewport(visibleRect);
-
-        for (let chunkY = visibleRect.top; chunkY < visibleRect.bottom; ++chunkY) {
-            for (let chunkX = visibleRect.left; chunkX < visibleRect.right; ++chunkX) {
-                let key = Wall.chunkKey(chunkX, chunkY);
-                let currentState = chunkDownloadStates.get(key);
-                if (currentState == null) {
-                    chunkDownloadStates.set(key, "requested");
-                    pendingChunks += 1;
-                }
-            }
-        }
-        console.info("pending chunks after viewport update", pendingChunks);
-    }
-
+        console.log("visibleRect", visibleRect);
+    });
     canvasRenderer.addEventListener(".viewportUpdate", sendViewportUpdate);
     sendViewportUpdate();
 
-    session.addEventListener("chunks", (event) => {
-        let { chunkInfo, chunkData } = event;
+    session.addEventListener("chunks", async (event) => {
+        let { chunkInfo, chunkData, hasMore } = event;
 
         console.info("received data for chunks", {
-            chunkInfoLength: chunkInfo.length,
+            chunkInfo,
             chunkDataSize: chunkData.size,
         });
 
+        let updatePromises = [];
         for (let info of event.chunkInfo) {
-            let key = Wall.chunkKey(info.position.x, info.position.y);
-            if (chunkDownloadStates.get(key) == "requested") {
-                pendingChunks -= 1;
-            }
-            chunkDownloadStates.set(key, "downloaded");
-
             if (info.length > 0) {
                 let blob = chunkData.slice(info.offset, info.offset + info.length, "image/webp");
-                createImageBitmap(blob).then((bitmap) => {
-                    let chunk = wall.getOrCreateChunk(info.position.x, info.position.y);
-                    chunk.ctx.globalCompositeOperation = "copy";
-                    chunk.ctx.drawImage(bitmap, 0, 0);
-                    chunk.syncToPixmap();
-                });
+                updatePromises.push(
+                    createImageBitmap(blob).then((bitmap) => {
+                        let chunk = wall.getOrCreateChunk(info.position.x, info.position.y);
+                        chunk.ctx.globalCompositeOperation = "copy";
+                        chunk.ctx.drawImage(bitmap, 0, 0);
+                        chunk.syncToPixmap();
+                    }),
+                );
             }
+        }
+
+        await Promise.all(updatePromises);
+        if (hasMore) {
+            console.info("more chunks are pending; requesting more");
+            session.sendMoreChunks();
         }
     });
 

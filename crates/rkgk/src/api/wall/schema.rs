@@ -94,6 +94,12 @@ pub struct ChunkInfo {
     rename_all_fields = "camelCase"
 )]
 pub enum Notify {
-    Wall { wall_event: wall::Event },
-    Chunks { chunks: Vec<ChunkInfo> },
+    Wall {
+        wall_event: wall::Event,
+    },
+
+    Chunks {
+        chunks: Vec<ChunkInfo>,
+        has_more: bool,
+    },
 }

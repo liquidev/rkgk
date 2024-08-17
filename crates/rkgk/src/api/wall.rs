@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use axum::{
     extract::{
@@ -194,8 +194,11 @@ struct SessionLoop {
     wall: Arc<Wall>,
     chunk_encoder: Arc<ChunkEncoder>,
     handle: SessionHandle,
+
     render_commands_tx: mpsc::Sender<RenderCommand>,
+
     viewport_chunks: ChunkIterator,
+    sent_chunks: HashSet<ChunkPosition>,
 }
 
 enum RenderCommand {
@@ -238,6 +241,7 @@ impl SessionLoop {
             handle,
             render_commands_tx,
             viewport_chunks: ChunkIterator::new(ChunkPosition::new(0, 0), ChunkPosition::new(0, 0)),
+            sent_chunks: HashSet::new(),
         })
     }
 
@@ -316,10 +320,16 @@ impl SessionLoop {
         let mut chunk_infos = vec![];
         let mut packet = vec![];
 
-        // Number of chunks iterated is limited to 300 per packet, so as not to let the client
+        // Number of chunks iterated is limited per packet, so as not to let the client
         // stall the server by sending in a huge viewport.
-        for _ in 0..300 {
+        let start = Instant::now();
+        let mut iterated = 0;
+        for i in 0..12000 {
             if let Some(position) = self.viewport_chunks.next() {
+                if self.sent_chunks.contains(&position) {
+                    continue;
+                }
+
                 if let Some(encoded) = self.chunk_encoder.encoded(position).await {
                     let offset = packet.len();
                     packet.extend_from_slice(&encoded);
@@ -335,25 +345,22 @@ impl SessionLoop {
                     // execute. We cap it to 256KiB in hopes that noone has Internet slow enough for
                     // this to cause a disconnect.
                     if packet.len() >= 256 * 1024 {
+                        iterated = i;
                         break;
                     }
-                } else {
-                    // Length 0 indicates the server acknowledged the chunk, but it has no
-                    // image data.
-                    // This is used by clients to know that the chunk doesn't need downloading.
-                    chunk_infos.push(ChunkInfo {
-                        position,
-                        offset: 0,
-                        length: 0,
-                    });
                 }
+
+                self.sent_chunks.insert(position);
             } else {
+                iterated = i;
                 break;
             }
         }
+        info!(elapsed = ?start.elapsed(), iterated, "send_chunks");
 
         ws.send(to_message(&Notify::Chunks {
             chunks: chunk_infos,
+            has_more: self.viewport_chunks.clone().next().is_some(),
         }))
         .await?;
         ws.send(Message::Binary(packet)).await?;

@@ -87,8 +87,13 @@ class CanvasRenderer extends HTMLElement {
 
                 let chunk = this.wall.getChunk(chunkX, chunkY);
                 if (chunk != null) {
+                    this.ctx.globalCompositeOperation = "source-over";
                     this.ctx.drawImage(chunk.canvas, x, y);
                 }
+
+                this.ctx.globalCompositeOperation = "difference";
+                this.ctx.fillStyle = "white";
+                this.ctx.fillText(`${chunkX}, ${chunkY}`, x, y + 12);
             }
         }
 

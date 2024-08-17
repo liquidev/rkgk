@@ -17,13 +17,14 @@ export class BrushEditor extends HTMLElement {
 
         this.textArea = this.appendChild(document.createElement("pre"));
         this.textArea.classList.add("text-area");
-        this.textArea.textContent = defaultBrush;
+        this.textArea.textContent = localStorage.getItem("rkgk.brushEditor.code") ?? defaultBrush;
         this.textArea.contentEditable = true;
         this.textArea.spellcheck = false;
         this.textArea.addEventListener("input", () => {
+            localStorage.setItem("rkgk.brushEditor.code", this.code);
             this.dispatchEvent(
                 Object.assign(new Event(".codeChanged"), {
-                    newCode: this.textArea.value,
+                    newCode: this.code,
                 }),
             );
         });

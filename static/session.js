@@ -208,6 +208,7 @@ class Session extends EventTarget {
                 Object.assign(new Event("chunks"), {
                     chunkInfo: notify.chunks,
                     chunkData,
+                    hasMore: notify.hasMore,
                 }),
             );
         }

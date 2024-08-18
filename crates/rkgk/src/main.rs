@@ -67,7 +67,9 @@ fn database(config: &Config, paths: &Paths<'_>) -> eyre::Result<Databases> {
     })
     .context("cannot start up login database")?;
 
-    let wall_broker = wall::Broker::new(config.wall);
+    create_dir_all(paths.database_dir.join("wall"))?;
+    let wall_broker =
+        wall::Broker::new(paths.database_dir.join("wall"), config.wall_broker.clone());
 
     Ok(Databases { login, wall_broker })
 }
@@ -89,7 +91,6 @@ async fn fallible_main() -> eyre::Result<()> {
     let dbs = Arc::new(database(&config, &paths)?);
 
     let api = Arc::new(Api { config, dbs });
-
     let app = Router::new()
         .route_service(
             "/",
@@ -116,9 +117,7 @@ async fn main() {
     let _client = tracy_client::Client::start();
 
     color_eyre::install().unwrap();
-    tracing_subscriber::fmt()
-        .with_span_events(FmtSpan::ACTIVE)
-        .init();
+    tracing_subscriber::fmt().init();
 
     match fallible_main().await {
         Ok(_) => (),

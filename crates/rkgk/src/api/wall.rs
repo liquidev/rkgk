@@ -1,4 +1,7 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashSet, VecDeque},
+    sync::Arc,
+};
 
 use axum::{
     extract::{
@@ -13,16 +16,20 @@ use schema::{
     ChunkInfo, Error, LoginRequest, LoginResponse, Notify, Online, Request, Version, WallInfo,
 };
 use serde::{Deserialize, Serialize};
-use tokio::{select, sync::mpsc, time::Instant};
-use tracing::{error, info};
+use tokio::{
+    select,
+    sync::{self, mpsc, oneshot},
+    time::Instant,
+};
+use tracing::{error, info, instrument};
 
 use crate::{
     haku::{Haku, Limits},
     login::database::LoginStatus,
     schema::Vec2,
     wall::{
-        self, chunk_encoder::ChunkEncoder, chunk_iterator::ChunkIterator, ChunkPosition, JoinError,
-        SessionHandle, UserInit, Wall,
+        self, auto_save::AutoSave, chunk_images::ChunkImages, chunk_iterator::ChunkIterator,
+        database::ChunkDataPair, ChunkPosition, JoinError, SessionHandle, UserInit, Wall,
     },
 };
 
@@ -110,7 +117,7 @@ async fn fallible_websocket(api: Arc<Api>, ws: &mut WebSocket) -> eyre::Result<(
         Some(wall) => wall,
         None => api.dbs.wall_broker.generate_id().await,
     };
-    let open_wall = api.dbs.wall_broker.open(wall_id);
+    let open_wall = api.dbs.wall_broker.open(wall_id).await?;
 
     let session_handle = match open_wall
         .wall
@@ -178,7 +185,8 @@ async fn fallible_websocket(api: Arc<Api>, ws: &mut WebSocket) -> eyre::Result<(
 
     SessionLoop::start(
         open_wall.wall,
-        open_wall.chunk_encoder,
+        open_wall.chunk_images,
+        open_wall.auto_save,
         session_handle,
         api.config.haku.clone(),
         login_request.init.brush,
@@ -192,24 +200,33 @@ async fn fallible_websocket(api: Arc<Api>, ws: &mut WebSocket) -> eyre::Result<(
 
 struct SessionLoop {
     wall: Arc<Wall>,
-    chunk_encoder: Arc<ChunkEncoder>,
+    chunk_images: Arc<ChunkImages>,
+    auto_save: Arc<AutoSave>,
     handle: SessionHandle,
 
     render_commands_tx: mpsc::Sender<RenderCommand>,
 
     viewport_chunks: ChunkIterator,
     sent_chunks: HashSet<ChunkPosition>,
+    pending_images: VecDeque<ChunkDataPair>,
 }
 
 enum RenderCommand {
-    SetBrush { brush: String },
-    Plot { points: Vec<Vec2> },
+    SetBrush {
+        brush: String,
+    },
+
+    Plot {
+        points: Vec<Vec2>,
+        done: oneshot::Sender<()>,
+    },
 }
 
 impl SessionLoop {
     async fn start(
         wall: Arc<Wall>,
-        chunk_encoder: Arc<ChunkEncoder>,
+        chunk_images: Arc<ChunkImages>,
+        auto_save: Arc<AutoSave>,
         handle: SessionHandle,
         limits: Limits,
         brush: String,
@@ -230,18 +247,20 @@ impl SessionLoop {
             .name(String::from("haku render thread"))
             .spawn({
                 let wall = Arc::clone(&wall);
-                let chunk_encoder = Arc::clone(&chunk_encoder);
-                move || Self::render_thread(wall, chunk_encoder, limits, render_commands_rx)
+                let chunk_images = Arc::clone(&chunk_images);
+                move || Self::render_thread(wall, chunk_images, limits, render_commands_rx)
             })
             .context("could not spawn render thread")?;
 
         Ok(Self {
             wall,
-            chunk_encoder,
+            chunk_images,
+            auto_save,
             handle,
             render_commands_tx,
             viewport_chunks: ChunkIterator::new(ChunkPosition::new(0, 0), ChunkPosition::new(0, 0)),
             sent_chunks: HashSet::new(),
+            pending_images: VecDeque::new(),
         })
     }
 
@@ -284,13 +303,28 @@ impl SessionLoop {
                             .await;
                     }
                     wall::EventKind::Plot { points } => {
-                        // We drop commands if we take too long to render instead of lagging
-                        // the WebSocket thread.
-                        // Theoretically this will yield much better responsiveness, but it _will_
-                        // result in some visual glitches if we're getting bottlenecked.
-                        _ = self.render_commands_tx.try_send(RenderCommand::Plot {
-                            points: points.clone(),
-                        })
+                        let chunks_to_modify: Vec<_> =
+                            chunks_to_modify(&self.wall, points).into_iter().collect();
+                        match self.chunk_images.load(chunks_to_modify.clone()).await {
+                            Ok(_) => {
+                                // We drop commands if we take too long to render instead of lagging
+                                // the WebSocket thread.
+                                // Theoretically this will yield much better responsiveness, but it _will_
+                                // result in some visual glitches if we're getting bottlenecked.
+                                let (done_tx, done_rx) = oneshot::channel();
+                                _ = self.render_commands_tx.try_send(RenderCommand::Plot {
+                                    points: points.clone(),
+                                    done: done_tx,
+                                });
+
+                                let auto_save = Arc::clone(&self.auto_save);
+                                tokio::spawn(async move {
+                                    _ = done_rx.await;
+                                    auto_save.request(chunks_to_modify).await;
+                                });
+                            }
+                            Err(err) => error!(?err, "while loading chunks for render command"),
+                        }
                     }
                 }
 
@@ -320,47 +354,53 @@ impl SessionLoop {
         let mut chunk_infos = vec![];
         let mut packet = vec![];
 
-        // Number of chunks iterated is limited per packet, so as not to let the client
-        // stall the server by sending in a huge viewport.
-        let start = Instant::now();
-        let mut iterated = 0;
-        for i in 0..12000 {
-            if let Some(position) = self.viewport_chunks.next() {
-                if self.sent_chunks.contains(&position) {
-                    continue;
-                }
+        if self.pending_images.is_empty() {
+            let mut positions = vec![];
 
-                if let Some(encoded) = self.chunk_encoder.encoded(position).await {
-                    let offset = packet.len();
-                    packet.extend_from_slice(&encoded);
-                    chunk_infos.push(ChunkInfo {
-                        position,
-                        offset: u32::try_from(offset).context("packet too big")?,
-                        length: u32::try_from(encoded.len()).context("chunk image too big")?,
-                    });
-
-                    // The actual number of chunks per packet is limited by the packet's size, which
-                    // we don't want to be too big, to maintain responsiveness - the client will
-                    // only request more chunks once per frame, so interactions still have time to
-                    // execute. We cap it to 256KiB in hopes that noone has Internet slow enough for
-                    // this to cause a disconnect.
-                    if packet.len() >= 256 * 1024 {
-                        iterated = i;
-                        break;
+            // Number of chunks iterated is limited per packet, so as not to let the client
+            // stall the server by sending in a huge viewport.
+            for _ in 0..9000 {
+                if let Some(position) = self.viewport_chunks.next() {
+                    if !self.sent_chunks.insert(position)
+                        || !self.chunk_images.chunk_exists(position)
+                    {
+                        continue;
                     }
+                    positions.push(position);
+                } else {
+                    break;
                 }
+            }
 
-                self.sent_chunks.insert(position);
-            } else {
-                iterated = i;
+            self.pending_images
+                .extend(self.chunk_images.encoded(positions).await);
+        }
+
+        while let Some(ChunkDataPair { position, data }) = self.pending_images.pop_front() {
+            let offset = packet.len();
+            packet.extend_from_slice(&data);
+            chunk_infos.push(ChunkInfo {
+                position,
+                offset: u32::try_from(offset).context("packet too big")?,
+                length: u32::try_from(data.len()).context("chunk image too big")?,
+            });
+
+            // The final number of chunks per packet is limited by the packet's size, which
+            // we don't want to be too big, to maintain responsiveness - the client will
+            // only request more chunks once per frame, so interactions still have time to
+            // execute. We cap it to 256KiB in hopes that noone has Internet slow enough for
+            // this to cause a disconnect.
+            //
+            // Note that after this there _may_ be more chunks pending in the queue.
+            if packet.len() >= 256 * 1024 {
                 break;
             }
         }
-        info!(elapsed = ?start.elapsed(), iterated, "send_chunks");
 
         ws.send(to_message(&Notify::Chunks {
             chunks: chunk_infos,
-            has_more: self.viewport_chunks.clone().next().is_some(),
+            has_more: !self.pending_images.is_empty()
+                || self.viewport_chunks.clone().next().is_some(),
         }))
         .await?;
         ws.send(Message::Binary(packet)).await?;
@@ -370,7 +410,7 @@ impl SessionLoop {
 
     fn render_thread(
         wall: Arc<Wall>,
-        chunk_encoder: Arc<ChunkEncoder>,
+        chunk_images: Arc<ChunkImages>,
         limits: Limits,
         mut commands: mpsc::Receiver<RenderCommand>,
     ) {
@@ -382,29 +422,51 @@ impl SessionLoop {
                 RenderCommand::SetBrush { brush } => {
                     brush_ok = haku.set_brush(&brush).is_ok();
                 }
-                RenderCommand::Plot { points } => {
+
+                RenderCommand::Plot { points, done } => {
                     if brush_ok {
                         if let Ok(value) = haku.eval_brush() {
                             for point in points {
                                 // Ignore the result. It's better if we render _something_ rather
                                 // than nothing.
-                                _ = draw_to_chunks(&haku, value, point, &wall, &chunk_encoder);
+                                _ = draw_to_chunks(&wall, &chunk_images, &haku, value, point);
                             }
                             haku.reset_vm();
                         }
                     }
+                    _ = done.send(());
                 }
             }
         }
     }
 }
 
+fn chunks_to_modify(wall: &Wall, points: &[Vec2]) -> HashSet<ChunkPosition> {
+    let mut chunks = HashSet::new();
+    for point in points {
+        let paint_area = wall.settings().paint_area as f32;
+        let left = point.x - paint_area / 2.0;
+        let top = point.y - paint_area / 2.0;
+        let top_left_chunk = wall.settings().chunk_at(Vec2::new(left, top));
+        let bottom_right_chunk = wall
+            .settings()
+            .chunk_at(Vec2::new(left + paint_area, top + paint_area));
+        for chunk_y in top_left_chunk.y..bottom_right_chunk.y {
+            for chunk_x in top_left_chunk.x..bottom_right_chunk.x {
+                chunks.insert(ChunkPosition::new(chunk_x, chunk_y));
+            }
+        }
+    }
+    chunks
+}
+
+#[instrument(skip(wall, chunk_images, haku, value))]
 fn draw_to_chunks(
+    wall: &Wall,
+    chunk_images: &ChunkImages,
     haku: &Haku,
     value: Value,
     center: Vec2,
-    wall: &Wall,
-    chunk_encoder: &ChunkEncoder,
 ) -> eyre::Result<()> {
     let settings = wall.settings();
 
@@ -414,10 +476,10 @@ fn draw_to_chunks(
     let left = center.x - paint_area / 2.0;
     let top = center.y - paint_area / 2.0;
 
-    let left_chunk = f32::floor(left / chunk_size) as i32;
-    let top_chunk = f32::floor(top / chunk_size) as i32;
-    let right_chunk = f32::ceil((left + paint_area) / chunk_size) as i32;
-    let bottom_chunk = f32::ceil((top + paint_area) / chunk_size) as i32;
+    let left_chunk = settings.chunk_at_1d(left);
+    let top_chunk = settings.chunk_at_1d(top);
+    let right_chunk = settings.chunk_at_1d(left + paint_area);
+    let bottom_chunk = settings.chunk_at_1d(top + paint_area);
     for chunk_y in top_chunk..bottom_chunk {
         for chunk_x in left_chunk..right_chunk {
             let x = f32::floor(-chunk_x as f32 * chunk_size + center.x);
@@ -428,11 +490,16 @@ fn draw_to_chunks(
         }
     }
 
-    for chunk_y in top_chunk..bottom_chunk {
-        for chunk_x in left_chunk..right_chunk {
-            chunk_encoder.invalidate_blocking(ChunkPosition::new(chunk_x, chunk_y))
-        }
-    }
+    // NOTE: Maybe sending in an iterator would be more efficient?
+    // If there were many chunks modified, (which there probably weren't,) this could allocate
+    // a lot of memory.
+    chunk_images.mark_modified_blocking(
+        (top_chunk..bottom_chunk)
+            .flat_map(|chunk_y| {
+                (left_chunk..right_chunk).map(move |chunk_x| ChunkPosition::new(chunk_x, chunk_y))
+            })
+            .collect(),
+    );
 
     Ok(())
 }

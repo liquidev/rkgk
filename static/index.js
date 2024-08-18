@@ -86,7 +86,6 @@ reticleRenderer.connectViewport(canvasRenderer.viewport);
     let sendViewportUpdate = debounce(updateInterval, () => {
         let visibleRect = canvasRenderer.getVisibleChunkRect();
         session.sendViewport(visibleRect);
-        console.log("visibleRect", visibleRect);
     });
     canvasRenderer.addEventListener(".viewportUpdate", sendViewportUpdate);
     sendViewportUpdate();

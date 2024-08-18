@@ -18,6 +18,7 @@ pub struct Database {
     command_tx: mpsc::Sender<Command>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoginStatus {
     ValidUser,
     UserDoesNotExist,
@@ -33,10 +34,12 @@ enum Command {
         nickname: String,
         reply: oneshot::Sender<eyre::Result<UserId>>,
     },
+
     LogIn {
         user_id: UserId,
         reply: oneshot::Sender<LoginStatus>,
     },
+
     UserInfo {
         user_id: UserId,
         reply: oneshot::Sender<eyre::Result<Option<UserInfo>>>,
@@ -79,8 +82,10 @@ impl Database {
 pub fn start(settings: &Settings) -> eyre::Result<Database> {
     let db = Connection::open(&settings.path).context("cannot open login database")?;
 
-    db.execute(
+    db.execute_batch(
         r#"
+            PRAGMA application_id = 0x726B674C; -- rkgL
+        
             CREATE TABLE IF NOT EXISTS
             t_users (
                 user_index           INTEGER PRIMARY KEY,
@@ -89,78 +94,81 @@ pub fn start(settings: &Settings) -> eyre::Result<Database> {
                 last_login_timestamp INTEGER NOT NULL
             );
         "#,
-        (),
     )?;
 
     let (command_tx, mut command_rx) = mpsc::channel(8);
 
     let mut user_id_rng = rand_chacha::ChaCha20Rng::from_entropy();
 
-    tokio::task::spawn_blocking(move || {
-        let mut s_insert_user = db
-            .prepare(
-                r#"
-                    INSERT INTO t_users
-                    (long_user_id, nickname, last_login_timestamp)
-                    VALUES (?, ?, ?);
-                "#,
-            )
-            .unwrap();
+    std::thread::Builder::new()
+        .name("login database thread".into())
+        .spawn(move || {
+            let mut s_insert_user = db
+                .prepare(
+                    r#"
+                        INSERT INTO t_users
+                        (long_user_id, nickname, last_login_timestamp)
+                        VALUES (?, ?, ?);
+                    "#,
+                )
+                .unwrap();
 
-        let mut s_log_in = db
-            .prepare(
-                r#"
-                    UPDATE OR ABORT t_users
-                    SET last_login_timestamp = ?
-                    WHERE long_user_id = ?;
-                "#,
-            )
-            .unwrap();
+            let mut s_log_in = db
+                .prepare(
+                    r#"
+                        UPDATE OR ABORT t_users
+                        SET last_login_timestamp = ?
+                        WHERE long_user_id = ?;
+                    "#,
+                )
+                .unwrap();
 
-        let mut s_user_info = db
-            .prepare(
-                r#"
-                    SELECT nickname
-                    FROM t_users
-                    WHERE long_user_id = ?
-                    LIMIT 1;
-                "#,
-            )
-            .unwrap();
+            let mut s_user_info = db
+                .prepare(
+                    r#"
+                        SELECT nickname
+                        FROM t_users
+                        WHERE long_user_id = ?
+                        LIMIT 1;
+                    "#,
+                )
+                .unwrap();
 
-        while let Some(command) = command_rx.blocking_recv() {
-            match command {
-                Command::NewUser { nickname, reply } => {
-                    let user_id = UserId::new(&mut user_id_rng);
-                    let result = s_insert_user
-                        .execute((user_id.0, nickname, Utc::now().timestamp()))
-                        .context("could not execute query");
-                    _ = reply.send(result.map(|_| user_id));
-                }
+            while let Some(command) = command_rx.blocking_recv() {
+                match command {
+                    Command::NewUser { nickname, reply } => {
+                        let user_id = UserId::new(&mut user_id_rng);
+                        let result = s_insert_user
+                            .execute((user_id.0, nickname, Utc::now().timestamp()))
+                            .context("could not execute query");
+                        _ = reply.send(result.map(|_| user_id));
+                    }
 
-                Command::LogIn { user_id, reply } => {
-                    // TODO: User expiration.
-                    let login_status = match s_log_in.execute((Utc::now().timestamp(), user_id.0)) {
-                        Ok(_) => LoginStatus::ValidUser,
-                        Err(_) => LoginStatus::UserDoesNotExist,
-                    };
-                    _ = reply.send(login_status);
-                }
+                    Command::LogIn { user_id, reply } => {
+                        // TODO: User expiration.
+                        let login_status =
+                            match s_log_in.execute((Utc::now().timestamp(), user_id.0)) {
+                                Ok(_) => LoginStatus::ValidUser,
+                                Err(_) => LoginStatus::UserDoesNotExist,
+                            };
+                        _ = reply.send(login_status);
+                    }
 
-                Command::UserInfo { user_id, reply } => {
-                    let result = s_user_info
-                        .query_row((user_id.0,), |row| {
-                            Ok(UserInfo {
-                                nickname: row.get(0)?,
+                    Command::UserInfo { user_id, reply } => {
+                        let result = s_user_info
+                            .query_row((user_id.0,), |row| {
+                                Ok(UserInfo {
+                                    nickname: row.get(0)?,
+                                })
                             })
-                        })
-                        .optional()
-                        .context("could not execute query");
-                    _ = reply.send(result);
+                            .optional()
+                            .context("could not execute query");
+                        _ = reply.send(result);
+                    }
                 }
             }
-        }
-    });
+        })
+        .context("cannot spawn thread")?;
 
     Ok(Database { command_tx })
 }

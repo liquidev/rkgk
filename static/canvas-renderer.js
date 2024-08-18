@@ -90,10 +90,6 @@ class CanvasRenderer extends HTMLElement {
                     this.ctx.globalCompositeOperation = "source-over";
                     this.ctx.drawImage(chunk.canvas, x, y);
                 }
-
-                this.ctx.globalCompositeOperation = "difference";
-                this.ctx.fillStyle = "white";
-                this.ctx.fillText(`${chunkX}, ${chunkY}`, x, y + 12);
             }
         }
 

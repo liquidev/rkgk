@@ -1,4 +1,4 @@
-[wall]
+[wall_broker.default_wall_settings]
 
 # The settings below control the creation of new walls.
 
@@ -13,13 +13,19 @@ max_sessions = 128
 
 # The size of chunks.
 # Choosing an appropriate size for chunks is a tradeoff between performance and disk space - 168 is
-# chosen as a reasonable default 
+# chosen as a reasonable default which is just small enough to perform operations on fairly quickly
+# and responsively.
 chunk_size = 168
 
 # The size of the area that can be drawn over by a brush, in pixels.
 # The larger this area, the more CPU-expensive brushes get overall, but the larger the image a brush
 # can produce.
 paint_area = 504
+
+[wall_broker.auto_save]
+
+# How often should modified chunks be saved to the database.
+interval_seconds = 10
 
 [haku]
 

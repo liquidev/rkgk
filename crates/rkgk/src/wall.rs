@@ -17,11 +17,14 @@ use tracing::info;
 
 use crate::{id, login::UserId, schema::Vec2, serialization::DeserializeFromStr};
 
+pub mod auto_save;
 pub mod broker;
-pub mod chunk_encoder;
+pub mod chunk_images;
 pub mod chunk_iterator;
+pub mod database;
 
 pub use broker::Broker;
+pub use database::Database;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WallId([u8; 32]);
@@ -82,10 +85,16 @@ impl fmt::Display for InvalidWallId {
 
 impl Error for InvalidWallId {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct ChunkPosition {
     pub x: i32,
     pub y: i32,
+}
+
+impl fmt::Debug for ChunkPosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
 }
 
 impl ChunkPosition {
@@ -115,11 +124,12 @@ pub struct Settings {
 }
 
 impl Settings {
+    pub fn chunk_at_1d(&self, x: f32) -> i32 {
+        f32::floor(x / self.chunk_size as f32) as i32
+    }
+
     pub fn chunk_at(&self, position: Vec2) -> ChunkPosition {
-        ChunkPosition::new(
-            f32::floor(position.x / self.chunk_size as f32) as i32,
-            f32::floor(position.y / self.chunk_size as f32) as i32,
-        )
+        ChunkPosition::new(self.chunk_at_1d(position.x), self.chunk_at_1d(position.y))
     }
 }
 
@@ -200,17 +210,19 @@ impl Wall {
         &self.settings
     }
 
+    pub fn has_chunk(&self, at: ChunkPosition) -> bool {
+        self.chunks.contains_key(&at)
+    }
+
     pub fn get_chunk(&self, at: ChunkPosition) -> Option<Arc<Mutex<Chunk>>> {
         self.chunks.get(&at).map(|chunk| Arc::clone(&chunk))
     }
 
     pub fn get_or_create_chunk(&self, at: ChunkPosition) -> Arc<Mutex<Chunk>> {
-        Arc::clone(
-            &self
-                .chunks
-                .entry(at)
-                .or_insert_with(|| Arc::new(Mutex::new(Chunk::new(self.settings.chunk_size)))),
-        )
+        Arc::clone(&self.chunks.entry(at).or_insert_with(|| {
+            info!(?at, "chunk created");
+            Arc::new(Mutex::new(Chunk::new(self.settings.chunk_size)))
+        }))
     }
 
     pub fn join(self: &Arc<Self>, session: Session) -> Result<SessionHandle, JoinError> {

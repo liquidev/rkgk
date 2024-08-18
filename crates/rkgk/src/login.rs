@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{id, serialization::DeserializeFromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UserId([u8; 32]);
+pub struct UserId(pub [u8; 32]);
 
 impl UserId {
     pub fn new(rng: &mut dyn RngCore) -> Self {

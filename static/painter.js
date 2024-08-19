@@ -5,7 +5,8 @@ export class Painter {
 
     renderBrushToWall(haku, centerX, centerY, wall) {
         let evalResult = haku.evalBrush();
-        if (evalResult.status != "ok") return evalResult;
+        if (evalResult.status != "ok")
+            return { status: "error", phase: "eval", result: evalResult };
 
         let left = centerX - this.paintArea / 2;
         let top = centerY - this.paintArea / 2;
@@ -21,7 +22,10 @@ export class Painter {
                 let chunk = wall.getOrCreateChunk(chunkX, chunkY);
 
                 let renderResult = haku.renderValue(chunk.pixmap, x, y);
-                if (renderResult.status != "ok") return renderResult;
+                if (renderResult.status != "ok") {
+                    haku.resetVm();
+                    return { status: "error", phase: "render", result: renderResult };
+                }
             }
         }
         haku.resetVm();
@@ -32,5 +36,7 @@ export class Painter {
                 chunk.syncFromPixmap();
             }
         }
+
+        return { status: "ok" };
     }
 }

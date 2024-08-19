@@ -183,7 +183,20 @@ function readUrl() {
 
     canvasRenderer.addEventListener(".paint", async (event) => {
         plotQueue.push({ x: event.x, y: event.y });
-        currentUser.renderBrushToChunks(wall, event.x, event.y);
+
+        if (currentUser.isBrushOk) {
+            brushEditor.resetErrors();
+
+            let result = currentUser.renderBrushToChunks(wall, event.x, event.y);
+            console.log(result);
+
+            if (result.status == "error") {
+                brushEditor.renderHakuResult(
+                    result.phase == "eval" ? "Evaluation" : "Rendering",
+                    result.result,
+                );
+            }
+        }
     });
 
     canvasRenderer.addEventListener(".viewportUpdate", () => reticleRenderer.render());
@@ -191,10 +204,10 @@ function readUrl() {
         updateUrl(session, canvasRenderer.viewport),
     );
 
-    currentUser.setBrush(brushEditor.code);
+    brushEditor.renderHakuResult("Compilation", currentUser.setBrush(brushEditor.code));
     brushEditor.addEventListener(".codeChanged", async () => {
         flushPlotQueue();
-        currentUser.setBrush(brushEditor.code);
+        brushEditor.renderHakuResult("Compilation", currentUser.setBrush(brushEditor.code));
         session.sendSetBrush(brushEditor.code);
     });
 

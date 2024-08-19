@@ -22,7 +22,7 @@ export class User {
     }
 
     renderBrushToChunks(wall, x, y) {
-        this.painter.renderBrushToWall(this.haku, x, y, wall);
+        return this.painter.renderBrushToWall(this.haku, x, y, wall);
     }
 }
 

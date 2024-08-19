@@ -60,6 +60,10 @@ button, textarea, input {
     font-family: inherit;
 }
 
+pre, code {
+    font-family: "Fira Code", monospace;    
+}
+
 /* Main container layout */
 
 main {
@@ -215,7 +219,24 @@ rkgk-brush-editor {
         height: 100%;
         margin: 0;
         resize: none;
-        font-family: "Fira Code", monospace;
+        white-space: pre-wrap;
+    }
+
+    &>.errors:empty, &>.error-header:empty {
+        display: none;
+    }
+
+    &>.error-header {
+        margin-top: 1em;
+        margin-bottom: 0;
+        font-size: 1rem;
+        color: var(--color-error);
+    }
+
+    &>.errors {
+        margin: 0;
+        color: var(--color-error);
+        white-space: pre-wrap;
     }
 }
 

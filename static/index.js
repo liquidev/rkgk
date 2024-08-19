@@ -12,15 +12,61 @@ let brushEditor = main.querySelector("rkgk-brush-editor");
 
 reticleRenderer.connectViewport(canvasRenderer.viewport);
 
+function updateUrl(session, viewport) {
+    let url = new URL(window.location);
+    url.hash = `${session.wallId}&x=${Math.floor(viewport.panX)}&y=${Math.floor(viewport.panY)}&zoom=${viewport.zoomLevel}`;
+    history.replaceState(null, "", url);
+}
+
+function readUrl() {
+    let url = new URL(window.location);
+    let fragments = url.hash.substring(1).split("&");
+
+    let wallId = null;
+    let viewport = { x: 0, y: 0, zoom: 0 };
+
+    if (fragments.length == 0) return { wallId, viewport };
+    if (fragments[0].startsWith("wall_") && fragments[0].length == 48) {
+        wallId = fragments[0];
+    }
+
+    for (let i = 1; i < fragments.length; ++i) {
+        let pair = fragments[i].split("=");
+        if (pair.length != 2) continue;
+
+        let [key, value] = pair;
+        try {
+            if (key == "x") viewport.x = parseFloat(value);
+            if (key == "y") viewport.y = parseFloat(value);
+            if (key == "zoom") viewport.zoom = parseFloat(value);
+        } catch (error) {
+            console.error(`broken fragment url value: ${key}=${value}`);
+        }
+    }
+
+    return { wallId, viewport };
+}
+
 // In the background, connect to the server.
 (async () => {
     await waitForLogin();
     console.info("login ready! starting session");
 
-    let session = await newSession(getUserId(), localStorage.getItem("rkgk.mostRecentWallId"), {
-        brush: brushEditor.code,
-    });
+    let urlData = readUrl();
+    canvasRenderer.viewport.panX = urlData.viewport.x;
+    canvasRenderer.viewport.panY = urlData.viewport.y;
+    canvasRenderer.viewport.zoomLevel = urlData.viewport.zoom;
+
+    let session = await newSession(
+        getUserId(),
+        urlData.wallId ?? localStorage.getItem("rkgk.mostRecentWallId"),
+        {
+            brush: brushEditor.code,
+        },
+    );
     localStorage.setItem("rkgk.mostRecentWallId", session.wallId);
+
+    updateUrl(session, canvasRenderer.viewport);
 
     let wall = new Wall(session.wallInfo);
     canvasRenderer.initialize(wall);
@@ -141,6 +187,9 @@ reticleRenderer.connectViewport(canvasRenderer.viewport);
     });
 
     canvasRenderer.addEventListener(".viewportUpdate", () => reticleRenderer.render());
+    canvasRenderer.addEventListener(".viewportUpdateEnd", () =>
+        updateUrl(session, canvasRenderer.viewport),
+    );
 
     currentUser.setBrush(brushEditor.code);
     brushEditor.addEventListener(".codeChanged", async () => {

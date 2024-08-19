@@ -88,6 +88,7 @@ class CanvasRenderer extends HTMLElement {
                 let chunk = this.wall.getChunk(chunkX, chunkY);
                 if (chunk != null) {
                     this.ctx.globalCompositeOperation = "source-over";
+                    this.ctx.imageSmoothingEnabled = false;
                     this.ctx.drawImage(chunk.canvas, x, y);
                 }
             }
@@ -123,6 +124,7 @@ class CanvasRenderer extends HTMLElement {
                         this.viewport.panAround(event.movementX, event.movementY);
                         this.dispatchEvent(new Event(".viewportUpdate"));
                     } else if (event.type == "mouseup") {
+                        this.dispatchEvent(new Event(".viewportUpdateEnd"));
                         break;
                     }
                 }
@@ -137,6 +139,7 @@ class CanvasRenderer extends HTMLElement {
             // TODO: Touchpad zoom
             this.viewport.zoomIn(event.deltaY > 0 ? -1 : 1);
             this.dispatchEvent(new Event(".viewportUpdate"));
+            this.dispatchEvent(new Event(".viewportUpdateEnd"));
         }
     }
 

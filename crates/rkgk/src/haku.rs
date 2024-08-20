@@ -30,6 +30,7 @@ pub struct Limits {
     pub call_stack_capacity: usize,
     pub ref_capacity: usize,
     pub fuel: usize,
+    pub memory: usize,
     pub pixmap_stack_capacity: usize,
     pub transform_stack_capacity: usize,
 }
@@ -58,6 +59,7 @@ impl Haku {
                 call_stack_capacity: limits.call_stack_capacity,
                 ref_capacity: limits.ref_capacity,
                 fuel: limits.fuel,
+                memory: limits.memory,
             },
         );
 

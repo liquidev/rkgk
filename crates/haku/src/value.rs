@@ -105,6 +105,7 @@ impl RefId {
 #[derive(Debug, Clone)]
 pub enum Ref {
     Closure(Closure),
+    List(List),
     Shape(Shape),
     Scribble(Scribble),
 }
@@ -141,6 +142,11 @@ pub struct Closure {
     pub name: FunctionName,
     pub param_count: u8,
     pub captures: Vec<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct List {
+    pub elements: Vec<Value>,
 }
 
 #[derive(Debug, Clone)]

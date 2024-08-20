@@ -17,6 +17,7 @@ pub struct VmLimits {
     pub call_stack_capacity: usize,
     pub ref_capacity: usize,
     pub fuel: usize,
+    pub memory: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +27,7 @@ pub struct Vm {
     refs: Vec<Ref>,
     defs: Vec<Value>,
     fuel: usize,
+    memory: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -33,6 +35,7 @@ pub struct VmImage {
     refs: usize,
     defs: usize,
     fuel: usize,
+    memory: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +58,7 @@ impl Vm {
             refs: Vec::with_capacity(limits.ref_capacity),
             defs: Vec::from_iter(iter::repeat(Value::Nil).take(defs.len() as usize)),
             fuel: limits.fuel,
+            memory: limits.memory,
         }
     }
 
@@ -75,6 +79,7 @@ impl Vm {
             refs: self.refs.len(),
             defs: self.defs.len(),
             fuel: self.fuel,
+            memory: self.memory,
         }
     }
 
@@ -397,6 +402,14 @@ impl Vm {
 
     pub fn create_exception(&self, message: &'static str) -> Exception {
         Exception { message }
+    }
+
+    pub fn track_array<T>(&mut self, array: &[T]) -> Result<(), Exception> {
+        self.memory = self
+            .memory
+            .checked_sub(core::mem::size_of_val(array))
+            .ok_or_else(|| self.create_exception("out of heap memory"))?;
+        Ok(())
     }
 }
 

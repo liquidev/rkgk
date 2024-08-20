@@ -68,6 +68,11 @@ ref_capacity = 2048
 # out of fuel means it will not be rendered at all, because there is no complete value returned.
 fuel = 65536
 
+# Amount of heap memory available to the VM.
+# Heap memory is used to limit how much data refs can allocate.
+# In particular, large arrays use up this memory - such as list backing arrays.
+memory = 1048576
+
 # Capacity of the renderer's pixmap stack.
 # The pixmap stack is used for blending layers together within a brush.
 # Each (composite)-type scribble requires a single entry on this pixmap stack.

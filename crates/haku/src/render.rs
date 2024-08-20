@@ -71,12 +71,17 @@ impl<'a> Renderer<'a> {
         let (_id, scribble) = vm
             .get_ref_value(value)
             .ok_or_else(|| Self::create_exception(vm, value, NOT_A_SCRIBBLE))?;
-        let Ref::Scribble(scribble) = scribble else {
-            return Err(Self::create_exception(vm, value, NOT_A_SCRIBBLE));
-        };
 
-        match scribble {
-            Scribble::Stroke(stroke) => self.render_stroke(vm, value, stroke)?,
+        match &scribble {
+            Ref::List(list) => {
+                for element in &list.elements {
+                    self.render(vm, *element)?;
+                }
+            }
+            Ref::Scribble(scribble) => match scribble {
+                Scribble::Stroke(stroke) => self.render_stroke(vm, value, stroke)?,
+            },
+            _ => return Err(Self::create_exception(vm, value, NOT_A_SCRIBBLE))?,
         }
 
         Ok(())

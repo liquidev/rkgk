@@ -99,8 +99,10 @@ impl Display for ChunkError {
 impl Error for ChunkError {}
 
 pub mod fns {
+    use alloc::vec::Vec;
+
     use crate::{
-        value::{Ref, Rgba, Scribble, Shape, Stroke, Value, Vec4},
+        value::{List, Ref, Rgba, Scribble, Shape, Stroke, Value, Vec4},
         vm::{Exception, FnArgs, Vm},
     };
 
@@ -132,6 +134,8 @@ pub mod fns {
             0x87 ".g" => rgba_g,
             0x88 ".b" => rgba_b,
             0x89 ".a" => rgba_a,
+
+            0x90 "list" => list,
 
             0xc0 "to-shape" => to_shape_f,
             0xc1 "line" => line,
@@ -387,6 +391,13 @@ pub mod fns {
 
         let rgba = args.get_rgba(vm, 0, "argument to (.a rgba) must be an (rgba)")?;
         Ok(Value::Number(rgba.r))
+    }
+
+    pub fn list(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
+        let elements: Vec<_> = (0..args.num()).map(|i| args.get(vm, i)).collect();
+        vm.track_array(&elements)?;
+        let id = vm.create_ref(Ref::List(List { elements }))?;
+        Ok(Value::Ref(id))
     }
 
     fn to_shape(value: Value, vm: &Vm) -> Option<Shape> {

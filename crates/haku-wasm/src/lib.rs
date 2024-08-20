@@ -45,6 +45,7 @@ struct Limits {
     call_stack_capacity: usize,
     ref_capacity: usize,
     fuel: usize,
+    memory: usize,
     pixmap_stack_capacity: usize,
     transform_stack_capacity: usize,
 }
@@ -60,6 +61,7 @@ impl Default for Limits {
             call_stack_capacity: 256,
             ref_capacity: 2048,
             fuel: 65536,
+            memory: 1024 * 1024,
             pixmap_stack_capacity: 4,
             transform_stack_capacity: 16,
         }
@@ -98,6 +100,7 @@ limit_setter!(stack_capacity);
 limit_setter!(call_stack_capacity);
 limit_setter!(ref_capacity);
 limit_setter!(fuel);
+limit_setter!(memory);
 limit_setter!(pixmap_stack_capacity);
 limit_setter!(transform_stack_capacity);
 
@@ -131,6 +134,7 @@ unsafe extern "C" fn haku_instance_new(limits: *const Limits) -> *mut Instance {
             call_stack_capacity: limits.call_stack_capacity,
             ref_capacity: limits.ref_capacity,
             fuel: limits.fuel,
+            memory: limits.memory,
         },
     );
 

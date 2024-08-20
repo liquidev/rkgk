@@ -51,6 +51,7 @@ fn eval(code: &str) -> Result<Value, Box<dyn Error>> {
             call_stack_capacity: 256,
             ref_capacity: 256,
             fuel: 32768,
+            memory: 1024,
         },
     );
     let chunk_id = system.add_chunk(chunk)?;

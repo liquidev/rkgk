@@ -1,11 +1,11 @@
 use alloc::vec::Vec;
 use tiny_skia::{
-    BlendMode, Color, LineCap, Paint, PathBuilder, Pixmap, Rect, Shader, Stroke as SStroke,
-    Transform,
+    BlendMode, Color, FillRule, LineCap, Paint, Path, PathBuilder, Pixmap, Rect, Shader,
+    Stroke as SStroke, Transform,
 };
 
 use crate::{
-    value::{Ref, Rgba, Scribble, Shape, Stroke, Value},
+    value::{Fill, Ref, Rgba, Scribble, Shape, Stroke, Value},
     vm::{Exception, Vm},
 };
 
@@ -81,11 +81,37 @@ impl<'a> Renderer<'a> {
             }
             Ref::Scribble(scribble) => match scribble {
                 Scribble::Stroke(stroke) => self.render_stroke(vm, value, stroke)?,
+                Scribble::Fill(fill) => self.render_fill(vm, value, fill)?,
             },
             _ => return Err(Self::create_exception(vm, value, NOT_A_SCRIBBLE))?,
         }
 
         Ok(())
+    }
+
+    fn shape_to_path(shape: &Shape) -> Path {
+        let mut pb = PathBuilder::new();
+        match shape {
+            Shape::Point(vec) => {
+                pb.move_to(vec.x, vec.y);
+                pb.line_to(vec.x, vec.y);
+            }
+            Shape::Line(start, end) => {
+                pb.move_to(start.x, start.y);
+                pb.line_to(end.x, end.y);
+            }
+            Shape::Rect(position, size) => {
+                if let Some(rect) =
+                    tiny_skia::Rect::from_xywh(position.x, position.y, size.x, size.y)
+                {
+                    pb.push_rect(rect);
+                }
+            }
+            Shape::Circle(position, radius) => {
+                pb.push_circle(position.x, position.y, *radius);
+            }
+        }
+        pb.finish().unwrap()
     }
 
     fn render_stroke(&mut self, _vm: &Vm, _value: Value, stroke: &Stroke) -> Result<(), Exception> {
@@ -94,86 +120,33 @@ impl<'a> Renderer<'a> {
             ..default_paint()
         };
         let transform = self.transform();
+        let path = Self::shape_to_path(&stroke.shape);
 
-        match stroke.shape {
-            Shape::Point(vec) => {
-                let mut pb = PathBuilder::new();
-                pb.move_to(vec.x, vec.y);
-                pb.line_to(vec.x, vec.y);
-                let path = pb.finish().unwrap();
+        self.pixmap_mut().stroke_path(
+            &path,
+            &paint,
+            &SStroke {
+                width: stroke.thickness,
+                line_cap: LineCap::Square,
+                ..Default::default()
+            },
+            transform,
+            None,
+        );
 
-                self.pixmap_mut().stroke_path(
-                    &path,
-                    &paint,
-                    &SStroke {
-                        width: stroke.thickness,
-                        line_cap: LineCap::Square,
-                        ..Default::default()
-                    },
-                    transform,
-                    None,
-                );
-            }
+        Ok(())
+    }
 
-            Shape::Line(start, end) => {
-                let mut pb = PathBuilder::new();
-                pb.move_to(start.x, start.y);
-                pb.line_to(end.x, end.y);
-                let path = pb.finish().unwrap();
+    fn render_fill(&mut self, _vm: &Vm, _value: Value, fill: &Fill) -> Result<(), Exception> {
+        let paint = Paint {
+            shader: Shader::SolidColor(tiny_skia_color(fill.color)),
+            ..default_paint()
+        };
+        let transform = self.transform();
+        let path = Self::shape_to_path(&fill.shape);
 
-                self.pixmap_mut().stroke_path(
-                    &path,
-                    &paint,
-                    &SStroke {
-                        width: stroke.thickness,
-                        line_cap: LineCap::Square,
-                        ..Default::default()
-                    },
-                    transform,
-                    None,
-                );
-            }
-
-            Shape::Rect(position, size) => {
-                let mut pb = PathBuilder::new();
-                if let Some(rect) =
-                    tiny_skia::Rect::from_xywh(position.x, position.y, size.x, size.y)
-                {
-                    pb.push_rect(rect);
-                }
-                let path = pb.finish().unwrap();
-
-                self.pixmap_mut().stroke_path(
-                    &path,
-                    &paint,
-                    &SStroke {
-                        width: stroke.thickness,
-                        line_cap: LineCap::Square,
-                        ..Default::default()
-                    },
-                    transform,
-                    None,
-                );
-            }
-
-            Shape::Circle(position, radius) => {
-                let mut pb = PathBuilder::new();
-                pb.push_circle(position.x, position.y, radius);
-                let path = pb.finish().unwrap();
-
-                self.pixmap_mut().stroke_path(
-                    &path,
-                    &paint,
-                    &SStroke {
-                        width: stroke.thickness,
-                        line_cap: LineCap::Square,
-                        ..Default::default()
-                    },
-                    transform,
-                    None,
-                );
-            }
-        }
+        self.pixmap_mut()
+            .fill_path(&path, &paint, FillRule::EvenOdd, transform, None);
 
         Ok(())
     }

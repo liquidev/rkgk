@@ -102,7 +102,7 @@ pub mod fns {
     use alloc::vec::Vec;
 
     use crate::{
-        value::{List, Ref, Rgba, Scribble, Shape, Stroke, Value, Vec2, Vec4},
+        value::{Fill, List, Ref, Rgba, Scribble, Shape, Stroke, Value, Vec2, Vec4},
         vm::{Exception, FnArgs, Vm},
     };
 
@@ -142,6 +142,7 @@ pub mod fns {
             0xc2 "rect" => rect,
             0xc3 "circle" => circle,
             0xe0 "stroke" => stroke,
+            0xe1 "fill" => fill,
         }
     }
 
@@ -504,6 +505,20 @@ pub mod fns {
                 color,
                 shape,
             })))?;
+            Ok(Value::Ref(id))
+        } else {
+            Ok(Value::Nil)
+        }
+    }
+
+    pub fn fill(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
+        if args.num() != 2 {
+            return Err(vm.create_exception("(fill) expects 2 arguments (fill color shape)"));
+        }
+
+        let color = args.get_rgba(vm, 0, "1st argument to (fill) must be a color (rgba)")?;
+        if let Some(shape) = to_shape(args.get(vm, 1), vm) {
+            let id = vm.create_ref(Ref::Scribble(Scribble::Fill(Fill { color, shape })))?;
             Ok(Value::Ref(id))
         } else {
             Ok(Value::Nil)

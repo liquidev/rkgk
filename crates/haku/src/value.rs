@@ -180,6 +180,13 @@ pub struct Stroke {
 }
 
 #[derive(Debug, Clone)]
+pub struct Fill {
+    pub color: Rgba,
+    pub shape: Shape,
+}
+
+#[derive(Debug, Clone)]
 pub enum Scribble {
     Stroke(Stroke),
+    Fill(Fill),
 }

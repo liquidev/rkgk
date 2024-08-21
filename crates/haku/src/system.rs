@@ -102,7 +102,7 @@ pub mod fns {
     use alloc::vec::Vec;
 
     use crate::{
-        value::{List, Ref, Rgba, Scribble, Shape, Stroke, Value, Vec4},
+        value::{List, Ref, Rgba, Scribble, Shape, Stroke, Value, Vec2, Vec4},
         vm::{Exception, FnArgs, Vm},
     };
 
@@ -139,6 +139,8 @@ pub mod fns {
 
             0xc0 "to-shape" => to_shape_f,
             0xc1 "line" => line,
+            0xc2 "rect" => rect,
+            0xc3 "circle" => circle,
             0xe0 "stroke" => stroke,
         }
     }
@@ -410,7 +412,7 @@ pub mod fns {
                     None
                 }
             }
-            Value::Vec4(vec) => Some(Shape::Point(vec)),
+            Value::Vec4(vec) => Some(Shape::Point(vec.into())),
         }
     }
 
@@ -436,7 +438,50 @@ pub mod fns {
         let start = args.get_vec4(vm, 0, ERROR)?;
         let end = args.get_vec4(vm, 1, ERROR)?;
 
-        let id = vm.create_ref(Ref::Shape(Shape::Line(start, end)))?;
+        let id = vm.create_ref(Ref::Shape(Shape::Line(start.into(), end.into())))?;
+        Ok(Value::Ref(id))
+    }
+
+    pub fn rect(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
+        static ARGS2: &str = "arguments to 2-argument (rect) must be (vec)";
+        static ARGS4: &str = "arguments to 4-argument (rect) must be numbers";
+
+        let (position, size) = match args.num() {
+            2 => (args.get_vec4(vm, 0, ARGS2)?.into(), args.get_vec4(vm, 1, ARGS2)?.into()),
+            4 => (
+                Vec2 {
+                    x: args.get_number(vm, 0, ARGS4)?,
+                    y: args.get_number(vm, 1, ARGS4)?,
+                },
+                Vec2 {
+                    x: args.get_number(vm, 2, ARGS4)?,
+                    y: args.get_number(vm, 3, ARGS4)?,
+                },
+            ),
+            _ => return Err(vm.create_exception("(rect) expects 2 arguments (rect position size) or 4 arguments (rect x y width height)"))
+        };
+
+        let id = vm.create_ref(Ref::Shape(Shape::Rect(position, size)))?;
+        Ok(Value::Ref(id))
+    }
+
+    pub fn circle(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
+        static ARGS2: &str = "arguments to 2-argument (circle) must be (vec) and a number";
+        static ARGS3: &str = "arguments to 3-argument (circle) must be numbers";
+
+        let (position, radius) = match args.num() {
+            2 => (args.get_vec4(vm, 0, ARGS2)?.into(), args.get_number(vm, 1, ARGS2)?),
+            3 => (
+                Vec2 {
+                    x: args.get_number(vm, 0, ARGS3)?,
+                    y: args.get_number(vm, 1, ARGS3)?,
+                },
+                args.get_number(vm, 2, ARGS3)?
+            ),
+            _ => return Err(vm.create_exception("(circle) expects 2 arguments (circle position radius) or 3 arguments (circle x y radius)"))
+        };
+
+        let id = vm.create_ref(Ref::Shape(Shape::Circle(position, radius)))?;
         Ok(Value::Ref(id))
     }
 

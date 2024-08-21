@@ -32,6 +32,8 @@ pub struct Vm {
 
 #[derive(Debug, Clone, Copy)]
 pub struct VmImage {
+    stack: usize,
+    call_stack: usize,
     refs: usize,
     defs: usize,
     fuel: usize,
@@ -76,6 +78,8 @@ impl Vm {
             "cannot image VM while running code"
         );
         VmImage {
+            stack: self.stack.len(),
+            call_stack: self.call_stack.len(),
             refs: self.refs.len(),
             defs: self.defs.len(),
             fuel: self.fuel,
@@ -84,10 +88,21 @@ impl Vm {
     }
 
     pub fn restore_image(&mut self, image: &VmImage) {
-        assert!(
-            self.stack.is_empty() && self.call_stack.is_empty(),
-            "cannot restore VM image while running code"
-        );
+        // NOTE: My initial assumption here was that system functions should not be able to restore
+        // the VM if it's running code.
+        // Turns out that was a bad assumption to make, because the VM may fail with an exception,
+        // in which case the call stack and stack may not be empty.
+        // assert!(
+        //     self.stack.is_empty() && self.call_stack.is_empty(),
+        //     "cannot restore VM image while running code"
+        // );
+
+        self.stack.resize_with(image.stack, || {
+            panic!("image must be a subset of the current VM")
+        });
+        self.call_stack.resize_with(image.call_stack, || {
+            panic!("image must be a subset of the current VM")
+        });
         self.refs.resize_with(image.refs, || {
             panic!("image must be a subset of the current VM")
         });
@@ -95,6 +110,7 @@ impl Vm {
             panic!("image must be a subset of the current VM")
         });
         self.fuel = image.fuel;
+        self.memory = image.memory;
     }
 
     pub fn apply_defs(&mut self, defs: &Defs) {

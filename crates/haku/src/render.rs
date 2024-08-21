@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use tiny_skia::{
-    BlendMode, Color, LineCap, Paint, PathBuilder, Pixmap, Shader, Stroke as SStroke, Transform,
+    BlendMode, Color, LineCap, Paint, PathBuilder, Pixmap, Rect, Shader, Stroke as SStroke,
+    Transform,
 };
 
 use crate::{
@@ -118,6 +119,46 @@ impl<'a> Renderer<'a> {
                 let mut pb = PathBuilder::new();
                 pb.move_to(start.x, start.y);
                 pb.line_to(end.x, end.y);
+                let path = pb.finish().unwrap();
+
+                self.pixmap_mut().stroke_path(
+                    &path,
+                    &paint,
+                    &SStroke {
+                        width: stroke.thickness,
+                        line_cap: LineCap::Square,
+                        ..Default::default()
+                    },
+                    transform,
+                    None,
+                );
+            }
+
+            Shape::Rect(position, size) => {
+                let mut pb = PathBuilder::new();
+                if let Some(rect) =
+                    tiny_skia::Rect::from_xywh(position.x, position.y, size.x, size.y)
+                {
+                    pb.push_rect(rect);
+                }
+                let path = pb.finish().unwrap();
+
+                self.pixmap_mut().stroke_path(
+                    &path,
+                    &paint,
+                    &SStroke {
+                        width: stroke.thickness,
+                        line_cap: LineCap::Square,
+                        ..Default::default()
+                    },
+                    transform,
+                    None,
+                );
+            }
+
+            Shape::Circle(position, radius) => {
+                let mut pb = PathBuilder::new();
+                pb.push_circle(position.x, position.y, radius);
                 let path = pb.finish().unwrap();
 
                 self.pixmap_mut().stroke_path(

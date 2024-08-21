@@ -68,6 +68,21 @@ impl From<f32> for Value {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+pub struct Vec2 {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl From<Vec4> for Vec2 {
+    fn from(value: Vec4) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 pub struct Vec4 {
     pub x: f32,
     pub y: f32,
@@ -151,8 +166,10 @@ pub struct List {
 
 #[derive(Debug, Clone)]
 pub enum Shape {
-    Point(Vec4),
-    Line(Vec4, Vec4),
+    Point(Vec2),
+    Line(Vec2, Vec2),
+    Rect(Vec2, Vec2),
+    Circle(Vec2, f32),
 }
 
 #[derive(Debug, Clone)]

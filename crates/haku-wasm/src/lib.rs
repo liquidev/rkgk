@@ -72,11 +72,14 @@ impl Default for Limits {
 
 #[no_mangle]
 extern "C" fn haku_limits_new() -> *mut Limits {
-    Box::leak(Box::new(Limits::default()))
+    let ptr = Box::leak(Box::new(Limits::default())) as *mut _;
+    debug!("created limits: {ptr:?}");
+    ptr
 }
 
 #[no_mangle]
 unsafe extern "C" fn haku_limits_destroy(limits: *mut Limits) {
+    debug!("destroying limits: {limits:?}");
     drop(Box::from_raw(limits))
 }
 
@@ -156,11 +159,15 @@ unsafe extern "C" fn haku_instance_new(limits: *const Limits) -> *mut Instance {
         value: Value::Nil,
         exception: None,
     });
-    Box::leak(instance)
+
+    let ptr = Box::leak(instance) as *mut _;
+    debug!("created instance: {ptr:?}");
+    ptr
 }
 
 #[no_mangle]
 unsafe extern "C" fn haku_instance_destroy(instance: *mut Instance) {
+    debug!("destroying instance: {instance:?}");
     drop(Box::from_raw(instance));
 }
 
@@ -253,11 +260,14 @@ struct Brush {
 
 #[no_mangle]
 extern "C" fn haku_brush_new() -> *mut Brush {
-    Box::leak(Box::new(Brush::default()))
+    let ptr = Box::leak(Box::new(Brush::default())) as *mut _;
+    debug!("created brush: {ptr:?}");
+    ptr
 }
 
 #[no_mangle]
 unsafe extern "C" fn haku_brush_destroy(brush: *mut Brush) {
+    debug!("destroying brush: {brush:?}");
     drop(Box::from_raw(brush))
 }
 
@@ -350,13 +360,16 @@ struct PixmapLock {
 
 #[no_mangle]
 extern "C" fn haku_pixmap_new(width: u32, height: u32) -> *mut PixmapLock {
-    Box::leak(Box::new(PixmapLock {
+    let ptr = Box::leak(Box::new(PixmapLock {
         pixmap: Pixmap::new(width, height).expect("invalid pixmap size"),
-    }))
+    })) as *mut _;
+    debug!("created pixmap with size {width}x{height}: {ptr:?}");
+    ptr
 }
 
 #[no_mangle]
 unsafe extern "C" fn haku_pixmap_destroy(pixmap: *mut PixmapLock) {
+    debug!("destroying pixmap: {pixmap:?}");
     drop(Box::from_raw(pixmap))
 }
 

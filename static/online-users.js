@@ -15,6 +15,10 @@ export class User {
         this.painter = new Painter(wallInfo.paintArea);
     }
 
+    destroy() {
+        this.haku.destroy();
+    }
+
     setBrush(brush) {
         let compileResult = this.haku.setBrush(brush);
         this.isBrushOk = compileResult.status == "ok";
@@ -57,6 +61,7 @@ export class OnlineUsers extends EventTarget {
     removeUser(sessionId) {
         if (this.#users.has(sessionId)) {
             let user = this.#users.get(sessionId);
+            user.destroy();
             console.info("user removed", sessionId, user.nickname);
             // TODO: Cleanup reticles
             this.#users.delete(sessionId);

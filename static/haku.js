@@ -130,6 +130,11 @@ export class Haku {
         w.haku_limits_destroy(pLimits);
     }
 
+    destroy() {
+        w.haku_brush_destroy(this.#pBrush);
+        w.haku_instance_destroy(this.#pInstance);
+    }
+
     setBrush(code) {
         w.haku_reset(this.#pInstance);
         // NOTE: Brush is invalid at this point, because we reset removes all defs and registered chunks.

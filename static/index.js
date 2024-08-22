@@ -139,7 +139,7 @@ function readUrl() {
     session.addEventListener("chunks", async (event) => {
         let { chunkInfo, chunkData, hasMore } = event;
 
-        console.info("received data for chunks", {
+        console.debug("received data for chunks", {
             chunkInfo,
             chunkDataSize: chunkData.size,
         });

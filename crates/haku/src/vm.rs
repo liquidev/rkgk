@@ -4,7 +4,7 @@ use core::{
     iter,
 };
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 use crate::{
     bytecode::{self, Defs, Opcode, CAPTURE_CAPTURE, CAPTURE_LOCAL},
@@ -416,8 +416,10 @@ impl Vm {
         }
     }
 
-    pub fn create_exception(&self, message: &'static str) -> Exception {
-        Exception { message }
+    pub fn create_exception(&self, message: impl Into<String>) -> Exception {
+        Exception {
+            message: message.into(),
+        }
     }
 
     pub fn track_array<T>(&mut self, array: &[T]) -> Result<(), Exception> {
@@ -492,15 +494,15 @@ impl FnArgs {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Exception {
-    pub message: &'static str,
+    pub message: String,
 }
 
 impl From<bytecode::ReadError> for Exception {
     fn from(_: bytecode::ReadError) -> Self {
         Self {
-            message: "corrupted bytecode",
+            message: "corrupted bytecode".into(),
         }
     }
 }

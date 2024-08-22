@@ -168,6 +168,19 @@ fn def_mutually_recursive() {
 }
 
 #[test]
+fn def_botsbuildbots() {
+    let result = eval("(def botsbuildbots (fn () (botsbuildbots))) (botsbuildbots)");
+    if let Err(error) = result {
+        assert_eq!(
+            error.to_string(),
+            "Exception {\n    message: \"too much recursion\",\n}"
+        );
+    } else {
+        panic!("error expected");
+    }
+}
+
+#[test]
 fn let_single() {
     let code = r#"
         (let ((x 1))

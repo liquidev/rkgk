@@ -111,6 +111,8 @@ impl Haku {
         let chunk_id = self.system.add_chunk(chunk).context("too many chunks")?;
         self.brush = Some(chunk_id);
 
+        self.vm.apply_defs(&self.defs);
+
         Ok(())
     }
 

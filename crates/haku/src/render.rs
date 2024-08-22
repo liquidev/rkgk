@@ -43,8 +43,8 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    fn create_exception(_vm: &Vm, _at: Value, message: &'static str) -> Exception {
-        Exception { message }
+    fn create_exception(vm: &Vm, _at: Value, message: &'static str) -> Exception {
+        vm.create_exception(message)
     }
 
     fn transform(&self) -> Transform {

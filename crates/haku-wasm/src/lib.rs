@@ -328,6 +328,8 @@ unsafe extern "C" fn haku_compile_brush(
     };
     brush.state = BrushState::Ready(chunk_id);
 
+    instance.vm.apply_defs(&instance.defs);
+
     info!("brush compiled into {chunk_id:?}");
 
     StatusCode::Ok

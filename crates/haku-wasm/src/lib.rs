@@ -12,7 +12,7 @@ use haku::{
         tiny_skia::{Pixmap, PremultipliedColorU8},
         Renderer, RendererLimits,
     },
-    sexp::{parse_toplevel, Ast, Parser},
+    sexp::{parse_toplevel, Ast, Parser, SourceCode},
     system::{ChunkId, System, SystemImage},
     value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
     vm::{Exception, Vm, VmImage, VmLimits},
@@ -37,6 +37,7 @@ unsafe extern "C" fn haku_free(ptr: *mut u8, size: usize, align: usize) {
 
 #[derive(Debug, Clone, Copy)]
 struct Limits {
+    max_source_code_len: usize,
     max_chunks: usize,
     max_defs: usize,
     ast_capacity: usize,
@@ -53,6 +54,7 @@ struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
+            max_source_code_len: 65536,
             max_chunks: 2,
             max_defs: 256,
             ast_capacity: 1024,
@@ -92,6 +94,7 @@ macro_rules! limit_setter {
     };
 }
 
+limit_setter!(max_source_code_len);
 limit_setter!(max_chunks);
 limit_setter!(max_defs);
 limit_setter!(ast_capacity);
@@ -193,6 +196,7 @@ unsafe extern "C" fn haku_exception_message_len(instance: *const Instance) -> u3
 #[repr(C)]
 enum StatusCode {
     Ok,
+    SourceCodeTooLong,
     ChunkTooBig,
     DiagnosticsEmitted,
     TooManyChunks,
@@ -223,6 +227,7 @@ extern "C" fn haku_is_exception(code: StatusCode) -> bool {
 extern "C" fn haku_status_string(code: StatusCode) -> *const i8 {
     match code {
         StatusCode::Ok => c"ok",
+        StatusCode::SourceCodeTooLong => c"source code is too long",
         StatusCode::ChunkTooBig => c"compiled bytecode is too large",
         StatusCode::DiagnosticsEmitted => c"diagnostics were emitted",
         StatusCode::TooManyChunks => c"too many registered bytecode chunks",
@@ -297,6 +302,10 @@ unsafe extern "C" fn haku_compile_brush(
 
     let code = core::str::from_utf8(slice::from_raw_parts(code, code_len as usize))
         .expect("invalid UTF-8");
+    let code = match SourceCode::limited_len(code, instance.limits.max_source_code_len) {
+        Some(code) => code,
+        None => return StatusCode::SourceCodeTooLong,
+    };
 
     let ast = Ast::new(instance.limits.ast_capacity);
     let mut parser = Parser::new(ast, code);

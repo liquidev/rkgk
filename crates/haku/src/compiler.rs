@@ -7,12 +7,12 @@ use alloc::vec::Vec;
 
 use crate::{
     bytecode::{Chunk, DefError, Defs, EmitError, Opcode, CAPTURE_CAPTURE, CAPTURE_LOCAL},
-    sexp::{Ast, NodeId, NodeKind, Span},
+    sexp::{Ast, NodeId, NodeKind, SourceCode, Span},
     system::System,
 };
 
 pub struct Source<'a> {
-    pub code: &'a str,
+    pub code: &'a SourceCode,
     pub ast: &'a Ast,
     pub system: &'a System,
 }

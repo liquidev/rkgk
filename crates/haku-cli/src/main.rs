@@ -6,7 +6,7 @@ use std::{error::Error, fmt::Display, io::BufRead};
 use haku::{
     bytecode::{Chunk, Defs},
     compiler::{compile_expr, Compiler, Source},
-    sexp::{parse_toplevel, Ast, Parser},
+    sexp::{parse_toplevel, Ast, Parser, SourceCode},
     system::System,
     value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
     vm::{Vm, VmLimits},
@@ -16,6 +16,7 @@ fn eval(code: &str) -> Result<Value, Box<dyn Error>> {
     let mut system = System::new(1);
 
     let ast = Ast::new(1024);
+    let code = SourceCode::unlimited_len(code);
     let mut parser = Parser::new(ast, code);
     let root = parse_toplevel(&mut parser);
     let ast = parser.ast;

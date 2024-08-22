@@ -1,4 +1,4 @@
-use core::{cell::Cell, fmt};
+use core::{cell::Cell, fmt, ops::Deref};
 
 use alloc::vec::Vec;
 
@@ -13,8 +13,40 @@ impl Span {
         Self { start, end }
     }
 
-    pub fn slice<'a>(&self, source: &'a str) -> &'a str {
-        &source[self.start..self.end]
+    pub fn slice<'a>(&self, source: &'a SourceCode) -> &'a str {
+        &source.code[self.start..self.end]
+    }
+}
+
+/// Source code string with a verified size limit.
+/// An exact size limit is not enforced by this type - it only ensures the string isn't longer than
+/// intended, to not stall the parser for an unexpected amount of time.
+#[derive(Debug, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct SourceCode {
+    code: str,
+}
+
+impl SourceCode {
+    pub fn limited_len(code: &str, max_len: usize) -> Option<&Self> {
+        if code.len() <= max_len {
+            Some(Self::unlimited_len(code))
+        } else {
+            None
+        }
+    }
+
+    pub fn unlimited_len(code: &str) -> &Self {
+        // SAFETY: SourceCode is a transparent wrapper around str, so converting between them is safe.
+        unsafe { core::mem::transmute(code) }
+    }
+}
+
+impl Deref for SourceCode {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.code
     }
 }
 
@@ -94,7 +126,7 @@ impl Ast {
 
     pub fn write(
         &self,
-        source: &str,
+        source: &SourceCode,
         node_id: NodeId,
         w: &mut dyn fmt::Write,
         mode: AstWriteMode,
@@ -102,7 +134,7 @@ impl Ast {
         #[allow(clippy::too_many_arguments)]
         fn write_list(
             ast: &Ast,
-            source: &str,
+            source: &SourceCode,
             w: &mut dyn fmt::Write,
             mode: AstWriteMode,
             mut head: NodeId,
@@ -131,7 +163,7 @@ impl Ast {
         // NOTE: Separated out to a separate function in case we ever want to introduce auto-indentation.
         fn write_rec(
             ast: &Ast,
-            source: &str,
+            source: &SourceCode,
             w: &mut dyn fmt::Write,
             mode: AstWriteMode,
             node_id: NodeId,
@@ -177,7 +209,7 @@ pub struct NodeAllocError;
 
 pub struct Parser<'a> {
     pub ast: Ast,
-    input: &'a str,
+    input: &'a SourceCode,
     position: usize,
     fuel: Cell<usize>,
     alloc_error: NodeId,
@@ -186,7 +218,7 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     const FUEL: usize = 256;
 
-    pub fn new(mut ast: Ast, input: &'a str) -> Self {
+    pub fn new(mut ast: Ast, input: &'a SourceCode) -> Self {
         let alloc_error = ast
             .alloc(Node {
                 span: Span::new(0, 0),
@@ -412,12 +444,13 @@ mod tests {
         expected: &str,
     ) -> Result<(), Box<dyn Error>> {
         let ast = Ast::new(16);
-        let mut p = Parser::new(ast, source);
+        let code = SourceCode::unlimited_len(source);
+        let mut p = Parser::new(ast, code);
         let node = f(&mut p);
         let ast = p.ast;
 
         let mut s = String::new();
-        ast.write(source, node, &mut s, AstWriteMode::Spans)?;
+        ast.write(code, node, &mut s, AstWriteMode::Spans)?;
 
         assert_eq!(s, expected);
 

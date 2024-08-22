@@ -33,6 +33,9 @@ interval_seconds = 10
 # Technically clients may override these settings with some hackery, but then the server may not
 # register changes they make to the canvas.
 
+# Maximum length of source code.
+max_source_code_len = 65536
+
 # Maximum amount of source code chunks.
 # This should be at least 2, to allow for loading in a standard library chunk.
 max_chunks = 2

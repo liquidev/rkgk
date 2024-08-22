@@ -8,7 +8,7 @@ use haku::{
     bytecode::{Chunk, Defs, DefsImage},
     compiler::{Compiler, Source},
     render::{tiny_skia::Pixmap, Renderer, RendererLimits},
-    sexp::{Ast, Parser},
+    sexp::{Ast, Parser, SourceCode},
     system::{ChunkId, System, SystemImage},
     value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
     vm::{Vm, VmImage, VmLimits},
@@ -22,6 +22,7 @@ use crate::schema::Vec2;
 // because we do some dynamic typing magic over on the JavaScript side to automatically call all
 // the appropriate functions for setting these limits on the client side.
 pub struct Limits {
+    pub max_source_code_len: usize,
     pub max_chunks: usize,
     pub max_defs: usize,
     pub ast_capacity: usize,
@@ -88,6 +89,8 @@ impl Haku {
         self.reset();
 
         let ast = Ast::new(self.limits.ast_capacity);
+        let code = SourceCode::limited_len(code, self.limits.max_source_code_len)
+            .ok_or_eyre("source code is too long")?;
         let mut parser = Parser::new(ast, code);
         let root = haku::sexp::parse_toplevel(&mut parser);
         let ast = parser.ast;

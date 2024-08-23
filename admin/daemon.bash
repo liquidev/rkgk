@@ -12,7 +12,7 @@ mkfifo $reload_fifo
 reload() {
     # This just kind of assumes recompilation doesn't take too long.
     kill "$rkgk_pid"
-    cargo run --release -- serve --port 8083 > "$build_log" 2>&1 &
+    just port=8083 serve wasm-release > "$build_log" 2>&1 &
     rkgk_pid="$!"
 }
 

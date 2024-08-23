@@ -1,5 +1,6 @@
 use std::{
     fs::{copy, create_dir_all, remove_dir_all},
+    net::Ipv4Addr,
     path::Path,
     sync::Arc,
 };
@@ -102,10 +103,15 @@ async fn fallible_main() -> eyre::Result<()> {
     #[cfg(debug_assertions)]
     let app = app.nest("/dev/live-reload", live_reload::router());
 
-    let listener = TcpListener::bind("0.0.0.0:8080")
+    let port: u16 = std::env::var("RKGK_PORT")
+        .unwrap_or("8080".into())
+        .parse()
+        .context("failed to parse RKGK_PORT")?;
+
+    let listener = TcpListener::bind((Ipv4Addr::from([0u8, 0, 0, 0]), port))
         .await
         .expect("cannot bind to port");
-    info!("listening on port 8080");
+    info!("listening on port {port}");
     axum::serve(listener, app).await.expect("cannot serve app");
 
     Ok(())

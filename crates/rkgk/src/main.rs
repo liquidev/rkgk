@@ -34,6 +34,7 @@ static GLOBAL_ALLOCATOR: tracy_client::ProfiledAllocator<std::alloc::System> =
 
 struct Paths<'a> {
     target_dir: &'a Path,
+    target_wasm_dir: &'a Path,
     database_dir: &'a Path,
 }
 
@@ -47,7 +48,7 @@ fn build(paths: &Paths<'_>) -> eyre::Result<()> {
     create_dir_all(paths.target_dir.join("static/wasm"))
         .context("cannot create static/wasm directory")?;
     copy(
-        "target/wasm32-unknown-unknown/wasm-dev/haku_wasm.wasm",
+        paths.target_wasm_dir.join("haku_wasm.wasm"),
         paths.target_dir.join("static/wasm/haku.wasm"),
     )
     .context("cannot copy haku.wasm file")?;
@@ -76,7 +77,10 @@ fn database(config: &Config, paths: &Paths<'_>) -> eyre::Result<Databases> {
 }
 
 async fn fallible_main() -> eyre::Result<()> {
+    let target_wasm_dir =
+        std::env::var("RKGK_WASM_PATH").unwrap_or("target/wasm32-unknown-unknown/wasm-dev".into());
     let paths = Paths {
+        target_wasm_dir: Path::new(&target_wasm_dir),
         target_dir: Path::new("target/site"),
         database_dir: Path::new("database"),
     };

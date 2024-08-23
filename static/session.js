@@ -17,6 +17,10 @@ export function getUserId() {
     return loginStorage.userId;
 }
 
+export function getLoginSecret() {
+    return loginStorage.secret;
+}
+
 export function waitForLogin() {
     return loggedInPromise;
 }
@@ -54,8 +58,8 @@ export async function registerUser(nickname) {
             };
         }
 
-        console.log(responseJson);
         loginStorage.userId = responseJson.userId;
+        loginStorage.secret = responseJson.secret;
         console.info("user registered", loginStorage.userId);
         saveLoginStorage();
         resolveLoggedInPromise();
@@ -71,9 +75,10 @@ export async function registerUser(nickname) {
 }
 
 class Session extends EventTarget {
-    constructor(userId) {
+    constructor(userId, secret) {
         super();
         this.userId = userId;
+        this.secret = secret;
     }
 
     async #recvJson() {
@@ -138,6 +143,9 @@ class Session extends EventTarget {
     }
 
     async joinInner(wallId, userInit) {
+        let secret = this.secret;
+        this.secret = null;
+
         let version = await this.#recvJson();
         console.info("protocol version", version.version);
         // TODO: This should probably verify that the version is compatible.
@@ -149,11 +157,13 @@ class Session extends EventTarget {
         if (this.wallId == null) {
             this.#sendJson({
                 user: this.userId,
+                secret,
                 init,
             });
         } else {
             this.#sendJson({
                 user: this.userId,
+                secret,
                 wall: wallId,
                 init,
             });
@@ -259,8 +269,8 @@ class Session extends EventTarget {
     }
 }
 
-export async function newSession(userId, wallId, userInit) {
-    let session = new Session(userId);
+export async function newSession(userId, secret, wallId, userInit) {
+    let session = new Session(userId, secret);
     await session.join(wallId, userInit);
     return session;
 }

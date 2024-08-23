@@ -13,3 +13,7 @@ haku.workspace = true
 log.workspace = true
 paste = "1.0.15"
 
+[features]
+default = []
+std = []
+

@@ -1,5 +1,5 @@
 import { Wall } from "./wall.js";
-import { getUserId, newSession, waitForLogin } from "./session.js";
+import { getLoginSecret, getUserId, newSession, waitForLogin } from "./session.js";
 import { debounce } from "./framework.js";
 import { ReticleCursor } from "./reticle-renderer.js";
 
@@ -59,6 +59,7 @@ function readUrl() {
 
     let session = await newSession(
         getUserId(),
+        getLoginSecret(),
         urlData.wallId ?? localStorage.getItem("rkgk.mostRecentWallId"),
         {
             brush: brushEditor.code,

@@ -10,6 +10,7 @@ use axum::{
     },
     response::Response,
 };
+use base64::Engine;
 use eyre::{bail, Context, OptionExt};
 use haku::value::Value;
 use schema::{
@@ -25,7 +26,7 @@ use tracing::{error, info, instrument};
 
 use crate::{
     haku::{Haku, Limits},
-    login::database::LoginStatus,
+    login::{self, database::LoginStatus},
     schema::Vec2,
     wall::{
         self, auto_save::AutoSave, chunk_images::ChunkImages, chunk_iterator::ChunkIterator,
@@ -90,16 +91,22 @@ async fn fallible_websocket(api: Arc<Api>, ws: &mut WebSocket) -> eyre::Result<(
 
     let login_request: LoginRequest = from_message(&recv_expect(ws).await?)?;
     let user_id = login_request.user;
+    let secret = base64::engine::general_purpose::URL_SAFE
+        .decode(&login_request.secret)
+        .expect("invalid secret string");
+    if secret.len() > login::Database::MAX_SECRET_LEN {
+        bail!("secret is too long");
+    }
 
     match api
         .dbs
         .login
-        .log_in(user_id)
+        .log_in(user_id, secret)
         .await
         .context("error while logging in")?
     {
         LoginStatus::ValidUser => (),
-        LoginStatus::UserDoesNotExist => {
+        LoginStatus::InvalidUser => {
             ws.send(to_message(&LoginResponse::UserDoesNotExist))
                 .await?;
             return Ok(());

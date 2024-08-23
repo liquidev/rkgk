@@ -22,6 +22,7 @@ pub struct Error {
 #[serde(rename_all = "camelCase")]
 pub struct LoginRequest {
     pub user: UserId,
+    pub secret: String,
     /// If null, a new wall is created.
     pub wall: Option<WallId>,
     pub init: UserInit,

@@ -34,7 +34,7 @@ struct NewUserParams {
 #[serde(tag = "status", rename_all = "camelCase")]
 enum NewUserResponse {
     #[serde(rename_all = "camelCase")]
-    Ok { user_id: String },
+    Ok { user_id: String, secret: String },
 
     #[serde(rename_all = "camelCase")]
     Error { message: String },
@@ -51,10 +51,11 @@ async fn login_new(api: State<Arc<Api>>, params: Json<NewUserParams>) -> impl In
     }
 
     match api.dbs.login.new_user(params.0.nickname).await {
-        Ok(user_id) => (
+        Ok(new_user) => (
             StatusCode::OK,
             Json(NewUserResponse::Ok {
-                user_id: user_id.to_string(),
+                user_id: new_user.user_id.to_string(),
+                secret: new_user.secret,
             }),
         ),
         Err(error) => (

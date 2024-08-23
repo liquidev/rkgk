@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -20,6 +20,7 @@ use haku::{
 use log::{debug, info};
 
 pub mod logging;
+#[cfg(not(feature = "std"))]
 mod panicking;
 
 #[global_allocator]

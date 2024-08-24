@@ -15,12 +15,14 @@ export class BrushEditor extends HTMLElement {
     connectedCallback() {
         this.classList.add("rkgk-panel");
 
-        this.textArea = this.appendChild(document.createElement("pre"));
+        this.textArea = this.appendChild(document.createElement("textarea"));
         this.textArea.classList.add("text-area");
-        this.textArea.textContent = localStorage.getItem("rkgk.brushEditor.code") ?? defaultBrush;
-        this.textArea.contentEditable = true;
+        this.textArea.value = localStorage.getItem("rkgk.brushEditor.code") ?? defaultBrush;
         this.textArea.spellcheck = false;
+        this.textArea.rows = 1;
         this.textArea.addEventListener("input", () => {
+            this.#resizeTextArea();
+
             localStorage.setItem("rkgk.brushEditor.code", this.code);
             this.dispatchEvent(
                 Object.assign(new Event(".codeChanged"), {
@@ -28,6 +30,7 @@ export class BrushEditor extends HTMLElement {
                 }),
             );
         });
+        this.#resizeTextArea();
 
         this.errorHeader = this.appendChild(document.createElement("h1"));
         this.errorHeader.classList.add("error-header");
@@ -36,8 +39,13 @@ export class BrushEditor extends HTMLElement {
         this.errorArea.classList.add("errors");
     }
 
+    #resizeTextArea() {
+        this.textArea.style.height = "";
+        this.textArea.style.height = `${this.textArea.scrollHeight}px`;
+    }
+
     get code() {
-        return this.textArea.textContent;
+        return this.textArea.value;
     }
 
     resetErrors() {

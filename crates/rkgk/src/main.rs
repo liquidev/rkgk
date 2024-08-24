@@ -13,10 +13,8 @@ use eyre::Context;
 use tokio::{fs, net::TcpListener};
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{info, info_span};
-use tracing_subscriber::fmt::format::FmtSpan;
 
 mod api;
-mod binary;
 mod config;
 mod haku;
 mod id;

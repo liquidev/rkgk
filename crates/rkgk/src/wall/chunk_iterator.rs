@@ -1,5 +1,3 @@
-use std::iter::Take;
-
 use super::ChunkPosition;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,26 +16,6 @@ impl ChunkIterator {
             left: top_left.x,
             bottom_right,
         }
-    }
-
-    pub fn take_next(&mut self, n: i32) -> Take<Self> {
-        assert!(n > 0);
-
-        let take = (*self).take(n as usize);
-
-        let x = self.cursor.x - self.left;
-        let width = self.bottom_right.x - self.left;
-        if width != 0 {
-            self.cursor.x = self.left + (x + n) % width;
-            self.cursor.y += n / width;
-        } else {
-            // In a width = 0 configuration, we iterate vertically.
-            // This is probably not the right thing to do, but we're just doing this to guard
-            // against malicious clients.
-            self.cursor.y += n;
-        }
-
-        take
     }
 }
 

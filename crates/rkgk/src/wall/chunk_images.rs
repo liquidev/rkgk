@@ -26,10 +26,6 @@ enum Command {
         chunks: Vec<ChunkPosition>,
         reply: oneshot::Sender<eyre::Result<()>>,
     },
-
-    MarkModified {
-        chunks: Vec<ChunkPosition>,
-    },
 }
 
 impl ChunkImages {
@@ -67,12 +63,6 @@ impl ChunkImages {
             .await
             .context("database is offline")?;
         rx.await.context("failed to load chunks")?
-    }
-
-    pub fn mark_modified_blocking(&self, chunks: Vec<ChunkPosition>) {
-        _ = self
-            .commands_tx
-            .blocking_send(Command::MarkModified { chunks });
     }
 
     pub fn chunk_exists(&self, position: ChunkPosition) -> bool {
@@ -221,16 +211,11 @@ impl ChunkImageLoop {
         while let Some(command) = commands_rx.recv().await {
             match command {
                 Command::Encode { chunks, reply } => {
-                    // TODO: This should have a caching layer.
                     tokio::spawn(Arc::clone(&self).encode(chunks, reply));
                 }
 
                 Command::Load { chunks, reply } => {
                     tokio::spawn(Arc::clone(&self).load(chunks, reply));
-                }
-
-                Command::MarkModified { chunks } => {
-                    // TODO: This should invalidate data from the caching layer.
                 }
             }
         }

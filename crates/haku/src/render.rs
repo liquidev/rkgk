@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use tiny_skia::{
-    BlendMode, Color, FillRule, LineCap, Paint, Path, PathBuilder, Pixmap, Rect, Shader,
+    BlendMode, Color, FillRule, LineCap, Paint, Path, PathBuilder, Pixmap, Shader,
     Stroke as SStroke, Transform,
 };
 

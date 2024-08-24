@@ -1,14 +1,13 @@
-use std::{backtrace::Backtrace, collections::HashSet, sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
-use dashmap::DashSet;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::mpsc,
     time::{interval, MissedTickBehavior},
 };
-use tracing::{info, instrument};
+use tracing::instrument;
 
-use super::{chunk_images::ChunkImages, ChunkPosition, Database, Wall};
+use super::{chunk_images::ChunkImages, ChunkPosition};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Settings {

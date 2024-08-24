@@ -1,16 +1,9 @@
-use std::{
-    convert::identity,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{convert::identity, path::PathBuf, sync::Arc};
 
-use chrono::Utc;
 use eyre::Context;
 use rusqlite::Connection;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, instrument};
-
-use crate::login::UserId;
 
 use super::{ChunkPosition, WallId};
 
@@ -32,18 +25,12 @@ pub struct ChunkDataPair {
 }
 
 enum Command {
-    SetWallInfo {
-        created_by: UserId,
-        title: String,
-        reply: oneshot::Sender<eyre::Result<()>>,
-    },
-
-    WriteChunks {
+    Write {
         chunks: Vec<ChunkDataPair>,
         reply: oneshot::Sender<eyre::Result<()>>,
     },
 
-    ReadChunks {
+    Read {
         chunks: Vec<ChunkPosition>,
         reply: oneshot::Sender<Vec<ChunkDataPair>>,
     },
@@ -62,7 +49,7 @@ impl Database {
     pub async fn write_chunks(&self, chunks: Vec<ChunkDataPair>) -> eyre::Result<()> {
         let (tx, rx) = oneshot::channel();
         self.command_tx
-            .send(Command::WriteChunks { chunks, reply: tx })
+            .send(Command::Write { chunks, reply: tx })
             .await
             .context("database is offline")?;
         rx.await.context("database returned an error")?
@@ -74,7 +61,7 @@ impl Database {
     ) -> eyre::Result<Vec<ChunkDataPair>> {
         let (tx, rx) = oneshot::channel();
         self.command_tx
-            .send(Command::ReadChunks { chunks, reply: tx })
+            .send(Command::Read { chunks, reply: tx })
             .await
             .context("database is offline")?;
         rx.await.context("database did not return anything")
@@ -207,17 +194,6 @@ pub fn start(settings: Settings) -> eyre::Result<Database> {
     std::thread::Builder::new()
         .name(format!("database thread {}", settings.wall_id))
         .spawn(move || {
-            let mut s_set_wall_info = db
-                .prepare(
-                    r#"
-                        INSERT OR REPLACE
-                        INTO t_wall_info
-                        (created_by, title)
-                        VALUES (?, ?);
-                    "#,
-                )
-                .unwrap();
-
             let mut s_write_chunk = db
                 .prepare(
                     r#"
@@ -250,20 +226,7 @@ pub fn start(settings: Settings) -> eyre::Result<Database> {
 
             while let Some(command) = command_rx.blocking_recv() {
                 match command {
-                    Command::SetWallInfo {
-                        created_by,
-                        title,
-                        reply,
-                    } => {
-                        _ = reply.send(
-                            s_set_wall_info
-                                .execute((created_by.0, title))
-                                .map(|_| ())
-                                .context("failed to set wall info"),
-                        );
-                    }
-
-                    Command::WriteChunks { chunks, reply } => {
+                    Command::Write { chunks, reply } => {
                         let mut result = Ok(());
                         for ChunkDataPair { position, data } in chunks {
                             if let Err(error) =
@@ -279,7 +242,7 @@ pub fn start(settings: Settings) -> eyre::Result<Database> {
                         ));
                     }
 
-                    Command::ReadChunks { chunks, reply } => {
+                    Command::Read { chunks, reply } => {
                         let result = chunks
                             .into_iter()
                             .flat_map(|position| {

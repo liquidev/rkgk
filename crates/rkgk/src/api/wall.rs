@@ -19,10 +19,9 @@ use schema::{
 use serde::{Deserialize, Serialize};
 use tokio::{
     select,
-    sync::{self, mpsc, oneshot},
-    time::Instant,
+    sync::{mpsc, oneshot},
 };
-use tracing::{error, info, instrument};
+use tracing::{error, instrument};
 
 use crate::{
     haku::{Haku, Limits},
@@ -254,8 +253,7 @@ impl SessionLoop {
             .name(String::from("haku render thread"))
             .spawn({
                 let wall = Arc::clone(&wall);
-                let chunk_images = Arc::clone(&chunk_images);
-                move || Self::render_thread(wall, chunk_images, limits, render_commands_rx)
+                move || Self::render_thread(wall, limits, render_commands_rx)
             })
             .context("could not spawn render thread")?;
 
@@ -415,12 +413,7 @@ impl SessionLoop {
         Ok(())
     }
 
-    fn render_thread(
-        wall: Arc<Wall>,
-        chunk_images: Arc<ChunkImages>,
-        limits: Limits,
-        mut commands: mpsc::Receiver<RenderCommand>,
-    ) {
+    fn render_thread(wall: Arc<Wall>, limits: Limits, mut commands: mpsc::Receiver<RenderCommand>) {
         let mut haku = Haku::new(limits);
         let mut brush_ok = false;
 
@@ -436,7 +429,7 @@ impl SessionLoop {
                             for point in points {
                                 // Ignore the result. It's better if we render _something_ rather
                                 // than nothing.
-                                _ = draw_to_chunks(&wall, &chunk_images, &haku, value, point);
+                                _ = draw_to_chunks(&wall, &haku, value, point);
                             }
                             haku.reset_vm();
                         }
@@ -467,14 +460,8 @@ fn chunks_to_modify(wall: &Wall, points: &[Vec2]) -> HashSet<ChunkPosition> {
     chunks
 }
 
-#[instrument(skip(wall, chunk_images, haku, value))]
-fn draw_to_chunks(
-    wall: &Wall,
-    chunk_images: &ChunkImages,
-    haku: &Haku,
-    value: Value,
-    center: Vec2,
-) -> eyre::Result<()> {
+#[instrument(skip(wall, haku, value))]
+fn draw_to_chunks(wall: &Wall, haku: &Haku, value: Value, center: Vec2) -> eyre::Result<()> {
     let settings = wall.settings();
 
     let chunk_size = settings.chunk_size as f32;
@@ -496,17 +483,6 @@ fn draw_to_chunks(
             haku.render_value(&mut chunk.pixmap, value, Vec2 { x, y })?;
         }
     }
-
-    // NOTE: Maybe sending in an iterator would be more efficient?
-    // If there were many chunks modified, (which there probably weren't,) this could allocate
-    // a lot of memory.
-    chunk_images.mark_modified_blocking(
-        (top_chunk..bottom_chunk)
-            .flat_map(|chunk_y| {
-                (left_chunk..right_chunk).map(move |chunk_x| ChunkPosition::new(chunk_x, chunk_y))
-            })
-            .collect(),
-    );
 
     Ok(())
 }

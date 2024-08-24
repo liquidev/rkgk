@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use argon2::{
-    password_hash::{PasswordHasher, Salt, SaltString},
+    password_hash::{PasswordHasher, SaltString},
     Argon2, PasswordHash, PasswordVerifier,
 };
 use base64::Engine;

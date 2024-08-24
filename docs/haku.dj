@@ -102,7 +102,7 @@ A function allows us to store a piece of code for later, and give it some _param
       (stroke 1 color (circle x (- y 8) 8))
       (stroke 1 color (circle x (+ y 8) 8)))))
 
-(circles (rgba 0 0 0 0) 0 0)
+(circles (rgba 0 0 0 1) 0 0)
 ```
 
 ## Limits

@@ -21,7 +21,7 @@ use tokio::{
     select,
     sync::{mpsc, oneshot},
 };
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
 
 use crate::{
     haku::{Haku, Limits},
@@ -450,7 +450,7 @@ fn chunks_to_modify(wall: &Wall, points: &[Vec2]) -> HashSet<ChunkPosition> {
         let top_left_chunk = wall.settings().chunk_at(Vec2::new(left, top));
         let bottom_right_chunk = wall
             .settings()
-            .chunk_at(Vec2::new(left + paint_area, top + paint_area));
+            .chunk_at_ceil(Vec2::new(left + paint_area, top + paint_area));
         for chunk_y in top_left_chunk.y..bottom_right_chunk.y {
             for chunk_x in top_left_chunk.x..bottom_right_chunk.x {
                 chunks.insert(ChunkPosition::new(chunk_x, chunk_y));
@@ -472,8 +472,8 @@ fn draw_to_chunks(wall: &Wall, haku: &Haku, value: Value, center: Vec2) -> eyre:
 
     let left_chunk = settings.chunk_at_1d(left);
     let top_chunk = settings.chunk_at_1d(top);
-    let right_chunk = settings.chunk_at_1d(left + paint_area);
-    let bottom_chunk = settings.chunk_at_1d(top + paint_area);
+    let right_chunk = settings.chunk_at_1d_ceil(left + paint_area);
+    let bottom_chunk = settings.chunk_at_1d_ceil(top + paint_area);
     for chunk_y in top_chunk..bottom_chunk {
         for chunk_x in left_chunk..right_chunk {
             let x = f32::floor(-chunk_x as f32 * chunk_size + center.x);

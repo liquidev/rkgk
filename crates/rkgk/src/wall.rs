@@ -128,8 +128,19 @@ impl Settings {
         f32::floor(x / self.chunk_size as f32) as i32
     }
 
+    pub fn chunk_at_1d_ceil(&self, x: f32) -> i32 {
+        f32::ceil(x / self.chunk_size as f32) as i32
+    }
+
     pub fn chunk_at(&self, position: Vec2) -> ChunkPosition {
         ChunkPosition::new(self.chunk_at_1d(position.x), self.chunk_at_1d(position.y))
+    }
+
+    pub fn chunk_at_ceil(&self, position: Vec2) -> ChunkPosition {
+        ChunkPosition::new(
+            self.chunk_at_1d_ceil(position.x),
+            self.chunk_at_1d_ceil(position.y),
+        )
     }
 }
 

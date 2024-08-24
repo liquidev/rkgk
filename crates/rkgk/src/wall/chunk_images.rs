@@ -160,7 +160,14 @@ impl ChunkImageLoop {
                     webp::Decoder::new(data)
                         .decode()
                         .and_then(|image| {
-                            info!(?position, "decoded");
+                            info!(
+                                ?position,
+                                width = image.width(),
+                                height = image.height(),
+                                data_len = image.len(),
+                                "decoded"
+                            );
+                            let image = image.to_image().into_rgba8();
                             let size = IntSize::from_wh(image.width(), image.height())?;
                             Pixmap::from_vec(image.to_vec(), size)
                         })
@@ -173,15 +180,16 @@ impl ChunkImageLoop {
 
         // I don't know yet if locking all the chunks is a good idea at this point.
         // I can imagine contended chunks having some trouble loading.
-        let chunk_arcs: Vec<_> = chunks
+        let chunk_arcs: Vec<_> = decoded
             .iter()
-            .map(|ChunkDataPair { position, .. }| self.wall.get_or_create_chunk(*position))
+            .map(|(position, _)| self.wall.get_or_create_chunk(*position))
             .collect();
         let mut chunk_refs = Vec::with_capacity(chunk_arcs.len());
         for arc in &chunk_arcs {
             chunk_refs.push(arc.lock().await);
         }
 
+        info!(num = ?chunk_refs.len(), "replacing chunks' pixmaps");
         for ((_, pixmap), mut chunk) in decoded.into_iter().zip(chunk_refs) {
             chunk.pixmap = pixmap;
         }

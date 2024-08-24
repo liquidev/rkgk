@@ -1,35 +1,41 @@
-import { isUserLoggedIn, registerUser } from "./session.js";
-
 export class Welcome extends HTMLElement {
     constructor() {
         super();
     }
 
     connectedCallback() {
-        this.dialog = this.querySelector("dialog[name='welcome-dialog']");
-        this.form = this.dialog.querySelector("form");
+        this.welcomeDialog = this.querySelector("dialog[name='welcome-dialog']");
+        this.welcomeForm = this.welcomeDialog.querySelector("form");
         this.nicknameField = this.querySelector("input[name='nickname']");
         this.registerButton = this.querySelector("button[name='register']");
         this.registerProgress = this.querySelector("rkgk-throbber[name='register-progress']");
 
-        if (!isUserLoggedIn()) {
-            this.dialog.showModal();
+        // Once the dialog is open, you need an account to use the website.
+        this.welcomeDialog.addEventListener("cancel", (event) => event.preventDefault());
+    }
 
-            // Require an account to use the website.
-            this.dialog.addEventListener("close", (event) => event.preventDefault());
+    show({ onRegister }) {
+        let resolvePromise;
+        let promise = new Promise((resolve) => (resolvePromise = resolve));
 
-            this.form.addEventListener("submit", async (event) => {
-                event.preventDefault();
+        this.welcomeDialog.showModal();
 
-                this.registerProgress.beginLoading();
-                let response = await registerUser(this.nicknameField.value);
-                if (response.status != "ok") {
-                    this.registerProgress.showError(response.message);
-                }
+        let submitListener = async (event) => {
+            event.preventDefault();
 
-                this.dialog.close();
-            });
-        }
+            this.registerProgress.beginLoading();
+            let response = await onRegister(this.nicknameField.value);
+            if (response.status == "ok") {
+                this.welcomeDialog.close();
+                resolvePromise();
+            } else {
+                this.registerProgress.showError(response.message);
+            }
+            this.welcomeForm.removeEventListener("submit", submitListener);
+        };
+        this.welcomeForm.addEventListener("submit", submitListener);
+
+        return promise;
     }
 }
 

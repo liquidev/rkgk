@@ -30,7 +30,7 @@ export class BrushEditor extends HTMLElement {
                 }),
             );
         });
-        this.#resizeTextArea();
+        requestAnimationFrame(() => this.#resizeTextArea());
 
         this.errorHeader = this.appendChild(document.createElement("h1"));
         this.errorHeader.classList.add("error-header");

@@ -1,5 +1,12 @@
 import { Wall } from "./wall.js";
-import { getLoginSecret, getUserId, newSession, waitForLogin } from "./session.js";
+import {
+    getLoginSecret,
+    getUserId,
+    isUserLoggedIn,
+    newSession,
+    registerUser,
+    waitForLogin,
+} from "./session.js";
 import { debounce } from "./framework.js";
 import { ReticleCursor } from "./reticle-renderer.js";
 
@@ -9,7 +16,10 @@ let main = document.querySelector("main");
 let canvasRenderer = main.querySelector("rkgk-canvas-renderer");
 let reticleRenderer = main.querySelector("rkgk-reticle-renderer");
 let brushEditor = main.querySelector("rkgk-brush-editor");
+let welcome = main.querySelector("rkgk-welcome");
+let connectionStatus = main.querySelector("rkgk-connection-status");
 
+document.getElementById("js-loading").remove();
 reticleRenderer.connectViewport(canvasRenderer.viewport);
 
 function updateUrl(session, viewport) {
@@ -49,6 +59,16 @@ function readUrl() {
 
 // In the background, connect to the server.
 (async () => {
+    console.info("checking for user registration status");
+    if (!isUserLoggedIn()) {
+        await welcome.show({
+            async onRegister(nickname) {
+                return await registerUser(nickname);
+            },
+        });
+    }
+
+    connectionStatus.showLoggingIn();
     await waitForLogin();
     console.info("login ready! starting session");
 
@@ -66,6 +86,8 @@ function readUrl() {
         },
     );
     localStorage.setItem("rkgk.mostRecentWallId", session.wallId);
+
+    connectionStatus.hideLoggingIn();
 
     updateUrl(session, canvasRenderer.viewport);
 

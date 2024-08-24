@@ -2,6 +2,8 @@
 
 <html>
     <head>
+        <meta charset="UTF-8">
+        
         <title>rakugaki</title>
 
         <link rel="stylesheet" href="static/index.css">
@@ -10,6 +12,7 @@
 
         <script src="static/brush-editor.js" type="module"></script>
         <script src="static/canvas-renderer.js" type="module"></script>
+        <script src="static/connection-status.js" type="module"></script>
         <script src="static/framework.js" type="module"></script>
         <script src="static/reticle-renderer.js" type="module"></script>
         <script src="static/session.js" type="module"></script>
@@ -17,13 +20,13 @@
         <script src="static/viewport.js" type="module"></script>
         <script src="static/welcome.js" type="module"></script>        
         
-        <script src="static/index.js" type="module"></script>
+        <script src="static/index.js" type="module" defer></script>
     </head>
 
     <body>
         <main>
-            <rkgk-canvas-renderer></rkgk-canvas-renderer>
-            <rkgk-reticle-renderer></rkgk-reticle-renderer>
+            <rkgk-canvas-renderer class="fullscreen"></rkgk-canvas-renderer>
+            <rkgk-reticle-renderer class="fullscreen"></rkgk-reticle-renderer>
             <rkgk-brush-editor></rkgk-brush-editor>
 
             <rkgk-welcome>
@@ -49,6 +52,25 @@
                     </form>
                 </dialog>
             </rkgk-welcome>
+
+            <rkgk-connection-status>
+                <dialog name="logging-in-dialog">
+                    <rkgk-throbber class="loading"></rkgk-throbber><p>Logging in...</p>
+                </dialog>
+            </rkgk-connection-status>
+
+            <div class="fullscreen" id="js-loading">
+                <rkgk-throbber class="loading"></rkgk-throbber>
+                <noscript>
+                    <style>
+                        #js-loading>rkgk-throbber { display: none; }
+                    </style>
+                    <p>
+                        rakugaki is a web app and does not work without JavaScript :(<br>
+                        but I swear it's a very lightweight and delightful web app!
+                    </p>
+                </noscript>
+            </div>
         </main>
     </body>
 </html>

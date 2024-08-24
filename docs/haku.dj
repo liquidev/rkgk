@@ -54,10 +54,55 @@ To do that, we'll aggregate our scribbles into a _list_:
 ```
 
 A list allows us to say, "I'd like this brush to draw this, this, and this."
-Of course, we are not limited to two elements only:
+Of course, we are not limited to two elements only.
+Here we'll use the `circle` function instead of `vec` to draw outlined circles.
 
 ```haku
+(list
+  (stroke 1 (rgba 0 0 0 1) (circle (- 8) 0 8))
+  (stroke 1 (rgba 0 0 0 1) (circle 8 0 8))
+  (stroke 1 (rgba 0 0 0 1) (circle 0 (- 8) 8))
+  (stroke 1 (rgba 0 0 0 1) (circle 0 8 8)))
+```
 
+But the moment we'll want to change any one of these values, such as the color... we'll have to edit _every_ single occurrence of it!
+
+To solve this, we can use a definition, or _def_ for short.
+We'll replace our literal colors with a shared def:
+
+```haku
+(def color (rgba 0 0 0 1))
+
+(list
+  (stroke 1 color (circle (- 8) 0 8))
+  (stroke 1 color (circle 8 0 8))
+  (stroke 1 color (circle 0 (- 8) 8))
+  (stroke 1 color (circle 0 8 8)))
+```
+
+And now we can control the color of the entire brush, without having to copy and paste it everywhere!
+
+You can try doing this to the other `stroke` parameters, too - try creating a def `thickness` for the stroke thickness, `distance` for distance from the mouse, and `radius` for the radius of the circles.
+
+## Repeating
+
+At this point, we may be happy with this implementation.
+But what if we want to draw four of these shapes, with different colors, next to each other?
+
+This is where _functions_ come in.
+
+A function allows us to store a piece of code for later, and give it some _parameters_, that'll be filled into the resulting value whenever the function is used.
+
+```haku
+(def circles
+  (fn (color x y)
+    (list
+      (stroke 1 color (circle (- x 8) y 8))
+      (stroke 1 color (circle (+ x 8) y 8))
+      (stroke 1 color (circle x (- y 8) 8))
+      (stroke 1 color (circle x (+ y 8) 8)))))
+
+(circles (rgba 0 0 0 0) 0 0)
 ```
 
 ## Limits

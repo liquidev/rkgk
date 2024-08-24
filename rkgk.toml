@@ -44,7 +44,7 @@ max_chunks = 2
 max_defs = 256
 
 # Maximum amount of AST nodes in a single parse.
-ast_capacity = 1024
+ast_capacity = 4096
 
 # Maximum size of a bytecode chunk.
 # This must be <= 65536 due to bytecode limitations - offsets are stored as 16-bit integers.

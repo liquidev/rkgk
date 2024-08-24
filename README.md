@@ -21,12 +21,15 @@ rustup target add wasm32-unknown-unknown
 # We use `just` to wrangle the process of building the client-side WebAssembly and the server.
 cargo install just
 
-# Now it's time to run
+# Now it's time to run the backend!
 just port=8080 profile=release
 ```
 
+Then, you can connect to `localhost:8080` to see the app in action.
+
 For development, I recommend using `cargo watch` for live reloading.
-`just` defaults to a development configuration.
+`just` defaults to a sensible development configuration.
+If you need to override the port, use the `port` variable as shown above.
 
 ```sh
 cargo install cargo-watch

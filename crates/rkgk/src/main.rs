@@ -7,6 +7,7 @@ use std::{
 
 use api::Api;
 use axum::Router;
+use color_eyre::owo_colors::OwoColorize;
 use config::Config;
 use copy_dir::copy_dir;
 use eyre::Context;

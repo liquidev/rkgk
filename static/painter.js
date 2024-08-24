@@ -4,6 +4,8 @@ export class Painter {
     }
 
     renderBrushToWall(haku, centerX, centerY, wall) {
+        haku.resetVm();
+
         let evalResult = haku.evalBrush();
         if (evalResult.status != "ok")
             return { status: "error", phase: "eval", result: evalResult };
@@ -23,12 +25,10 @@ export class Painter {
 
                 let renderResult = haku.renderValue(chunk.pixmap, x, y);
                 if (renderResult.status != "ok") {
-                    haku.resetVm();
                     return { status: "error", phase: "render", result: renderResult };
                 }
             }
         }
-        haku.resetVm();
 
         for (let y = topChunk; y < bottomChunk; ++y) {
             for (let x = leftChunk; x < rightChunk; ++x) {

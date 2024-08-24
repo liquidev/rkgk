@@ -410,9 +410,12 @@ unsafe extern "C" fn haku_eval_brush(instance: *mut Instance, brush: *const Brus
         return StatusCode::OutOfRefSlots;
     };
 
+    debug!("resetting exception");
+    instance.exception = None;
     instance.value = match instance.vm.run(&instance.system, closure_id) {
         Ok(value) => value,
         Err(exn) => {
+            debug!("setting exception {exn:?}");
             instance.exception = Some(exn);
             return StatusCode::EvalException;
         }
@@ -429,6 +432,8 @@ unsafe extern "C" fn haku_render_value(
     translation_y: f32,
 ) -> StatusCode {
     let instance = &mut *instance;
+    debug!("resetting exception");
+    instance.exception = None;
 
     let pixmap_locked = &mut (*pixmap).pixmap;
 

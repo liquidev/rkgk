@@ -215,12 +215,14 @@ rkgk-reticle-cursor {
 
 rkgk-brush-editor {
     &>.text-area {
-        box-sizing: border-box;
         width: 100%;
         margin: 0;
+        padding-top: 0.4em; /* to account for line-height */
         resize: none;
         white-space: pre-wrap;
         border: none;
+        overflow: hidden;
+        box-sizing: border-box;
     }
 
     &>.errors:empty, &>.error-header:empty {

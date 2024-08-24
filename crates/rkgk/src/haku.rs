@@ -114,8 +114,6 @@ impl Haku {
         let chunk_id = self.system.add_chunk(chunk).context("too many chunks")?;
         self.brush = Some(chunk_id);
 
-        self.vm.apply_defs(&self.defs);
-
         Ok(())
     }
 
@@ -123,6 +121,8 @@ impl Haku {
         let brush = self
             .brush
             .ok_or_eyre("brush is not compiled and ready to be used")?;
+
+        self.vm.apply_defs(&self.defs);
 
         let closure_id = self
             .vm

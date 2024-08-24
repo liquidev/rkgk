@@ -174,6 +174,7 @@ unsafe extern "C" fn haku_instance_destroy(instance: *mut Instance) {
 
 #[no_mangle]
 unsafe extern "C" fn haku_reset(instance: *mut Instance) {
+    debug!("resetting instance: {instance:?}");
     let instance = &mut *instance;
     instance.system.restore_image(&instance.system_image);
     instance.defs.restore_image(&instance.defs_image);
@@ -181,6 +182,7 @@ unsafe extern "C" fn haku_reset(instance: *mut Instance) {
 
 #[no_mangle]
 unsafe extern "C" fn haku_reset_vm(instance: *mut Instance) {
+    debug!("resetting instance VM: {instance:?}");
     let instance = &mut *instance;
     instance.vm.restore_image(&instance.vm_image);
 }
@@ -348,8 +350,6 @@ unsafe extern "C" fn haku_compile_brush(
     };
     brush.state = BrushState::Ready(chunk_id);
 
-    instance.vm.apply_defs(&instance.defs);
-
     info!("brush compiled into {chunk_id:?}");
 
     StatusCode::Ok
@@ -394,6 +394,9 @@ unsafe extern "C" fn haku_eval_brush(instance: *mut Instance, brush: *const Brus
     let BrushState::Ready(chunk_id) = brush.state else {
         panic!("brush is not compiled and ready to be used");
     };
+
+    debug!("applying defs");
+    instance.vm.apply_defs(&instance.defs);
 
     let Ok(closure_id) = instance.vm.create_ref(Ref::Closure(Closure {
         start: BytecodeLoc {

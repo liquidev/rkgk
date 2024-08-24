@@ -56,8 +56,6 @@ export class BrushEditor extends HTMLElement {
     renderHakuResult(phase, result) {
         this.resetErrors();
 
-        console.log(result);
-
         if (result.status != "error") return;
 
         this.errorHeader.textContent = `${phase} failed`;

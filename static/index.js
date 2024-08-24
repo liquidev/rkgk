@@ -189,8 +189,6 @@ function readUrl() {
             brushEditor.resetErrors();
 
             let result = currentUser.renderBrushToChunks(wall, event.x, event.y);
-            console.log(result);
-
             if (result.status == "error") {
                 brushEditor.renderHakuResult(
                     result.phase == "eval" ? "Evaluation" : "Rendering",

@@ -115,6 +115,10 @@ class CanvasRenderer extends HTMLElement {
         }
     }
 
+    sendViewportUpdate() {
+        this.dispatchEvent(new Event(".viewportUpdate"));
+    }
+
     async #panningBehaviour() {
         while (true) {
             let mouseDown = await listen([this, "mousedown"]);
@@ -124,7 +128,7 @@ class CanvasRenderer extends HTMLElement {
                     let event = await listen([window, "mousemove"], [window, "mouseup"]);
                     if (event.type == "mousemove") {
                         this.viewport.panAround(event.movementX, event.movementY);
-                        this.dispatchEvent(new Event(".viewportUpdate"));
+                        this.sendViewportUpdate();
                     } else if (event.type == "mouseup" && event.button == mouseDown.button) {
                         this.dispatchEvent(new Event(".viewportUpdateEnd"));
                         break;
@@ -140,7 +144,7 @@ class CanvasRenderer extends HTMLElement {
 
             // TODO: Touchpad zoom
             this.viewport.zoomIn(event.deltaY > 0 ? -1 : 1);
-            this.dispatchEvent(new Event(".viewportUpdate"));
+            this.sendViewportUpdate();
             this.dispatchEvent(new Event(".viewportUpdateEnd"));
         }
     }

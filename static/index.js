@@ -28,8 +28,8 @@ function updateUrl(session, viewport) {
     history.replaceState(null, "", url);
 }
 
-function readUrl() {
-    let url = new URL(window.location);
+function readUrl(urlString) {
+    let url = new URL(urlString);
     let fragments = url.hash.substring(1).split("&");
 
     let wallId = null;
@@ -72,7 +72,7 @@ function readUrl() {
     await waitForLogin();
     console.info("login ready! starting session");
 
-    let urlData = readUrl();
+    let urlData = readUrl(window.location);
     canvasRenderer.viewport.panX = urlData.viewport.x;
     canvasRenderer.viewport.panY = urlData.viewport.y;
     canvasRenderer.viewport.zoomLevel = urlData.viewport.zoom;
@@ -111,6 +111,19 @@ function readUrl() {
     connectionStatus.hideLoggingIn();
 
     updateUrl(session, canvasRenderer.viewport);
+
+    addEventListener("hashchange", (event) => {
+        let newUrlData = readUrl(event.newURL);
+        if (newUrlData.wallId != urlData.wallId) {
+            // Different wall, reload the app.
+            window.location.reload();
+        } else {
+            canvasRenderer.viewport.panX = newUrlData.viewport.x;
+            canvasRenderer.viewport.panY = newUrlData.viewport.y;
+            canvasRenderer.viewport.zoomLevel = newUrlData.viewport.zoom;
+            canvasRenderer.sendViewportUpdate();
+        }
+    });
 
     let wall = new Wall(session.wallInfo);
     canvasRenderer.initialize(wall);

@@ -90,6 +90,28 @@ main {
         top: 0;
     }
 
+    &>.panels {
+        box-sizing: border-box;
+        padding: 16px;
+
+        display: grid;
+        grid-template-columns: [left] 1fr [right] 384px;
+
+        /* Pass all events through. Children may receive events as normal. */
+        pointer-events: none;
+
+        &>* {
+            pointer-events: all;
+        }
+
+        &>rkgk-brush-editor {
+            grid-column: right / right;
+            height: fit-content;
+            max-height: 100%;
+            overflow: auto;
+        }
+    }
+
     &>rkgk-canvas-renderer {
         width: 100%;
         height: 100%;
@@ -109,10 +131,6 @@ main {
 
     &>rkgk-brush-editor {
         width: 384px;
-        position: absolute;
-        right: 0;
-        top: 0;
-        margin: 16px;
     }
 
     &>#js-loading {
@@ -209,6 +227,7 @@ rkgk-throbber {
     border: none;
     border-radius: 16px;
     box-shadow: var(--panel-box-shadow);
+    box-sizing: border-box;
 }
 
 /* Canvas renderer */
@@ -266,9 +285,9 @@ rkgk-reticle-cursor {
 
 rkgk-brush-editor {
     &>.text-area {
+        display: block;
         width: 100%;
         margin: 0;
-        padding-top: 0.4em; /* to account for line-height */
         resize: none;
         white-space: pre-wrap;
         border: none;

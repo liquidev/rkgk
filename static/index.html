@@ -55,12 +55,38 @@
 
             <rkgk-connection-status>
                 <dialog name="logging-in-dialog">
-                    <rkgk-throbber class="loading"></rkgk-throbber><p>Logging in...</p>
+                    <rkgk-throbber class="loading"></rkgk-throbber><p>Logging in…</p>
+                </dialog>
+
+                <dialog name="error-dialog" class="rkgk-panel">
+                    <h1>owie! >_<</h1>
+                    <p><i>Uh oh. Seems like the pipe cracked again… There's water everywhere.<br>The basement's half full already. God dammit.</i></p>
+
+                    <p>Super sorry about this! But rakugaki encountered an error and has to restart.</p>
+                    <p><b>Rest assured your drawings are safe and sound.</b></p>
+                    <p>Either way… try refreshing the page and see if it helps. If not, please report a bug with the following details.</p>
+
+                    <details>
+                        <summary>Show error details</summary>
+                        <textarea name="error-text" rows="10" readonly></textarea>
+                    </details>
+
+                    <p>Thank you from the mountain!</p>
+
+                    <div style="display: flex; flex-direction: row; align-items: center; justify-content: end;">
+                        <button name="refresh">Refresh</button>
+                    </div>
+                </dialog>
+
+                <dialog name="disconnected-dialog">
+                    <rkgk-throbber class="loading"></rkgk-throbber>
+                    <p>Connection lost. Attempting to reconnect in <span name="reconnect-duration"></span>…</p>
                 </dialog>
             </rkgk-connection-status>
 
             <div class="fullscreen" id="js-loading">
                 <rkgk-throbber class="loading"></rkgk-throbber>
+
                 <noscript>
                     <style>
                         #js-loading>rkgk-throbber { display: none; }
@@ -68,6 +94,7 @@
                     <p>
                         rakugaki is a web app and does not work without JavaScript :(<br>
                         but I swear it's a very lightweight and delightful web app!
+                        You won't regret trying it out.
                     </p>
                 </noscript>
             </div>

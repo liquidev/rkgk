@@ -134,6 +134,11 @@ class Session extends EventTarget {
             }
         });
 
+        this.ws.addEventListener("close", (_) => {
+            console.info("connection closed");
+            this.dispatchEvent(new Event("disconnect"));
+        });
+
         try {
             await listen([this.ws, "open"]);
             await this.joinInner(wallId, userInit);
@@ -269,8 +274,10 @@ class Session extends EventTarget {
     }
 }
 
-export async function newSession(userId, secret, wallId, userInit) {
+export async function newSession({ userId, secret, wallId, userInit, onError, onDisconnect }) {
     let session = new Session(userId, secret);
+    session.addEventListener("error", onError);
+    session.addEventListener("disconnect", onDisconnect);
     await session.join(wallId, userInit);
     return session;
 }

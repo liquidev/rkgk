@@ -77,14 +77,35 @@ function readUrl() {
     canvasRenderer.viewport.panY = urlData.viewport.y;
     canvasRenderer.viewport.zoomLevel = urlData.viewport.zoom;
 
-    let session = await newSession(
-        getUserId(),
-        getLoginSecret(),
-        urlData.wallId ?? localStorage.getItem("rkgk.mostRecentWallId"),
-        {
+    let session = await newSession({
+        userId: getUserId(),
+        secret: getLoginSecret(),
+        wallId: urlData.wallId ?? localStorage.getItem("rkgk.mostRecentWallId"),
+        userInit: {
             brush: brushEditor.code,
         },
-    );
+
+        onError(error) {
+            connectionStatus.showError(error.source);
+        },
+
+        async onDisconnect() {
+            let duration = 5000 + Math.random() * 1000;
+            while (true) {
+                console.info("waiting a bit for the server to come back up", duration);
+                await connectionStatus.showDisconnected(duration);
+                try {
+                    console.info("trying to reconnect");
+                    let response = await fetch("/auto-reload/back-up");
+                    if (response.status == 200) {
+                        window.location.reload();
+                        break;
+                    }
+                } catch (e) {}
+                duration = duration * 1.618033989 + Math.random() * 1000;
+            }
+        },
+    });
     localStorage.setItem("rkgk.mostRecentWallId", session.wallId);
 
     connectionStatus.hideLoggingIn();

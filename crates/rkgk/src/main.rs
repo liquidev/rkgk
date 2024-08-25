@@ -18,7 +18,6 @@ mod api;
 mod config;
 mod haku;
 mod id;
-#[cfg(debug_assertions)]
 mod live_reload;
 mod login;
 pub mod schema;
@@ -102,8 +101,7 @@ async fn fallible_main() -> eyre::Result<()> {
         .nest_service("/static", ServeDir::new(paths.target_dir.join("static")))
         .nest("/api", api::router(api));
 
-    #[cfg(debug_assertions)]
-    let app = app.nest("/dev/live-reload", live_reload::router());
+    let app = app.nest("/auto-reload", live_reload::router());
 
     let port: u16 = std::env::var("RKGK_PORT")
         .unwrap_or("8080".into())

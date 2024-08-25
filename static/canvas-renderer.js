@@ -16,9 +16,11 @@ class CanvasRenderer extends HTMLElement {
         resizeObserver.observe(this);
 
         this.#cursorReportingBehaviour();
-        this.#draggingBehaviour();
+        this.#panningBehaviour();
         this.#zoomingBehaviour();
         this.#paintingBehaviour();
+
+        this.addEventListener("contextmenu", (event) => event.preventDefault());
     }
 
     initialize(wall, painter) {
@@ -113,17 +115,17 @@ class CanvasRenderer extends HTMLElement {
         }
     }
 
-    async #draggingBehaviour() {
+    async #panningBehaviour() {
         while (true) {
             let mouseDown = await listen([this, "mousedown"]);
-            if (mouseDown.button == 1) {
+            if (mouseDown.button == 1 || mouseDown.button == 2) {
                 mouseDown.preventDefault();
                 while (true) {
                     let event = await listen([window, "mousemove"], [window, "mouseup"]);
                     if (event.type == "mousemove") {
                         this.viewport.panAround(event.movementX, event.movementY);
                         this.dispatchEvent(new Event(".viewportUpdate"));
-                    } else if (event.type == "mouseup") {
+                    } else if (event.type == "mouseup" && event.button == mouseDown.button) {
                         this.dispatchEvent(new Event(".viewportUpdateEnd"));
                         break;
                     }

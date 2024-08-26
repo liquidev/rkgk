@@ -1,0 +1,196 @@
+/* Variables */
+
+:root {
+    --color-text: #111;
+    --color-error: #db344b;
+
+    --color-brand-blue: #40b1f4;
+    
+    --color-panel-border: rgba(0, 0, 0, 20%);
+    --color-panel-background: #fff;
+    --color-shaded-background: rgba(0, 0, 0, 5%);
+
+    --panel-border-radius: 16px;
+    --panel-box-shadow: 0 0 0 1px var(--color-panel-border);
+    --panel-padding: 12px;
+    --dialog-backdrop: rgba(255, 255, 255, 0.5);
+}
+
+/* Reset */ 
+
+body {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+
+    color: var(--color-text);
+    line-height: 1.4;
+}
+
+/* Fonts */
+
+@font-face {
+    font-family: "Fira Sans";
+    src:
+        local("Fira Sans Regular"),
+        url("font/FiraSans-Regular.ttf");
+    font-weight: 400;
+}
+
+@font-face {
+    font-family: "Fira Sans";
+    src:
+        local("Fira Sans Italic"),
+        url("font/FiraSans-Italic.ttf");
+    font-weight: 400;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: "Fira Sans";
+    src:
+        local("Fira Sans Bold"),
+        url("font/FiraSans-Bold.ttf");
+    font-weight: 700;
+}
+
+@font-face {
+    font-family: "Fira Sans";
+    src:
+        local("Fira Sans Bold Italic"),
+        url("font/FiraSans-BoldItalic.ttf");
+    font-weight: 700;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: "Fira Code";
+    src:
+        local("Fira Code"),
+        url("font/FiraCode-VariableFont_wght.ttf");
+    font-weight: 400;
+}
+
+:root {
+    font-size: 87.5%;
+    font-family: "Fira Sans", sans-serif;
+}
+
+button, textarea, input {
+    font-size: inherit;
+    font-family: inherit;
+}
+
+pre, code, textarea {
+    font-family: "Fira Code", monospace;    
+}
+
+/* Buttons */
+
+button {
+    border: 1px solid var(--color-panel-border);
+    border-radius: 9999px;
+    padding: 0.5rem 1.5rem;
+    background-color: var(--color-panel-background);
+}
+
+/* Text areas */ 
+
+input {
+    border: none;
+    border-bottom: 1px solid var(--color-panel-border);
+}
+
+*:focus {
+    outline: 1px solid #40b1f4;
+    outline-offset: 4px;
+}
+
+/* Modal dialogs */
+
+dialog:not([open]) {
+    /* Weird this doesn't seem to work by default. */
+    display: none;
+}
+
+dialog::backdrop {
+    background-color: var(--dialog-backdrop);
+    backdrop-filter: blur(8px);
+}
+
+/* Details */
+
+details>summary {
+    cursor: pointer;
+}
+
+/* Throbbers */
+
+@keyframes rkgk-throbber-loading {
+    0% {
+        clip-path: inset(0% 100% 0% 0%);
+        animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+    }
+
+    50% {
+        clip-path: inset(0% 0% 0% 0%);
+        animation-timing-function: cubic-bezier(0.61, 1, 0.88, 1);
+    }
+
+    100% {
+        clip-path: inset(0% 0% 0% 100%);
+    }
+}
+
+rkgk-throbber {
+    display: inline;
+
+    &.loading {
+        display: block;
+        width: 16px;
+        height: 16px;
+        background-color: var(--color-brand-blue);
+        animation: infinite alternate rkgk-throbber-loading;
+        /* I wonder how many people will get _that_ reference. */
+        animation-duration: calc(60s / 141.98);
+    }
+
+    &.error {
+        /* This could use an icon. */
+        color: var(--color-error);
+    }
+}
+
+/* Panels */
+
+.rkgk-panel {
+    display: block;
+    background: var(--color-panel-background);
+    padding: var(--panel-border-radius);
+    border: none;
+    border-radius: 16px;
+    box-shadow: var(--panel-box-shadow);
+    box-sizing: border-box;
+}
+
+/* Horizontal separators */
+
+hr {
+    border: none;
+    border-bottom: 1px solid var(--color-panel-border);
+}
+
+/* Lists */
+
+ul, ol {
+    padding-left: 20px;
+}
+
+/* Code examples */
+
+pre:has(code) {
+    background-color: var(--color-shaded-background);
+    border-radius: 8px;
+    padding: 1em 1em;
+}
+

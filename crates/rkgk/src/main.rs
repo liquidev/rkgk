@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsStr,
     fs::{copy, create_dir_all, remove_dir_all},
     net::Ipv4Addr,
     path::Path,
@@ -7,12 +8,15 @@ use std::{
 
 use api::Api;
 use axum::Router;
-use config::Config;
+use config::{BuildConfig, Config, RenderTemplateFiles};
 use copy_dir::copy_dir;
 use eyre::Context;
+use handlebars::Handlebars;
+use serde::Serialize;
 use tokio::{fs, net::TcpListener};
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{info, info_span};
+use tracing::{info, info_span, instrument};
+use walkdir::WalkDir;
 
 mod api;
 mod config;
@@ -20,7 +24,7 @@ mod haku;
 mod id;
 mod live_reload;
 mod login;
-pub mod schema;
+mod schema;
 mod serialization;
 mod wall;
 
@@ -35,8 +39,9 @@ struct Paths<'a> {
     database_dir: &'a Path,
 }
 
-fn build(paths: &Paths<'_>) -> eyre::Result<()> {
-    let _span = info_span!("build").entered();
+#[instrument(skip(paths, config))]
+fn build(paths: &Paths<'_>, config: &BuildConfig) -> eyre::Result<()> {
+    info!("building static site");
 
     _ = remove_dir_all(paths.target_dir);
     create_dir_all(paths.target_dir).context("cannot create target directory")?;
@@ -49,6 +54,64 @@ fn build(paths: &Paths<'_>) -> eyre::Result<()> {
         paths.target_dir.join("static/wasm/haku.wasm"),
     )
     .context("cannot copy haku.wasm file")?;
+
+    let mut handlebars = Handlebars::new();
+    for entry in WalkDir::new("template") {
+        let entry = entry?;
+        let path = entry.path();
+        let file_name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        if file_name
+            .rsplit_once('.')
+            .is_some_and(|(left, _)| left.ends_with(".hbs"))
+        {
+            handlebars.register_template_file(&file_name, path)?;
+            info!(file_name, "registered template");
+        }
+    }
+
+    #[derive(Serialize)]
+    struct DjotData {
+        title: String,
+        content: String,
+    }
+
+    for render_template in &config.render_templates {
+        info!(?render_template);
+        match &render_template.files {
+            RenderTemplateFiles::Directory { from_dir, to_dir } => {
+                create_dir_all(paths.target_dir.join(to_dir))?;
+
+                for entry in WalkDir::new(from_dir) {
+                    let entry = entry?;
+                    let inner_path = entry.path().strip_prefix(from_dir)?;
+
+                    if entry.path().extension() == Some(OsStr::new("dj")) {
+                        let djot = std::fs::read_to_string(entry.path())?;
+                        let events = jotdown::Parser::new(&djot);
+                        let content = jotdown::html::render_to_string(events);
+                        let title = config
+                            .page_titles
+                            .get(entry.path())
+                            .cloned()
+                            .unwrap_or_else(|| entry.path().to_string_lossy().into_owned());
+                        let rendered = handlebars
+                            .render(&render_template.template, &DjotData { title, content })?;
+                        std::fs::write(
+                            paths
+                                .target_dir
+                                .join(to_dir)
+                                .join(inner_path.with_extension("html")),
+                            rendered,
+                        )?;
+                    }
+                }
+            }
+        }
+    }
 
     Ok(())
 }
@@ -89,7 +152,7 @@ async fn fallible_main() -> eyre::Result<()> {
     )
     .context("cannot deserialize config file")?;
 
-    build(&paths)?;
+    build(&paths, &config.build)?;
     let dbs = Arc::new(database(&config, &paths)?);
 
     let api = Arc::new(Api { config, dbs });
@@ -99,6 +162,7 @@ async fn fallible_main() -> eyre::Result<()> {
             ServeFile::new(paths.target_dir.join("static/index.html")),
         )
         .nest_service("/static", ServeDir::new(paths.target_dir.join("static")))
+        .nest_service("/docs", ServeDir::new(paths.target_dir.join("docs")))
         .nest("/api", api::router(api));
 
     let app = app.nest("/auto-reload", live_reload::router());

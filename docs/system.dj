@@ -1,4 +1,4 @@
-# haku system library
+# System library
 
 haku comes with a set of built-in functions, called the _system library._
 This is a reference for these functions.

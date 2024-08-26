@@ -1,3 +1,21 @@
+[build]
+
+# The settings below control how the site is compiled down to static files.
+
+# List of Handlebars templates to render.
+render_templates = [
+    { template = "docs.hbs.html", from_dir = "docs", to_dir = "docs" }
+]
+
+[build.page_titles]
+
+# This is a mapping of filenames to page titles.
+# The Djot template mode exposes this data as the variable {{ title }}.
+# When a title is not provided, the path is used.
+
+"docs/rkgk.dj" = "Introduction to rakugaki"
+"docs/system.dj" = "System library"
+
 [wall_broker.default_wall_settings]
 
 # The settings below control the creation of new walls.

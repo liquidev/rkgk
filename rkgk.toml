@@ -61,6 +61,12 @@ max_chunks = 2
 # Maximum amount of defs across all source code chunks.
 max_defs = 256
 
+# Maximum amount of tokens a single chunk can have.
+max_tokens = 4096
+
+# Maximum amount of events that the parser may emit in a single chunk.
+max_parser_events = 4096
+
 # Maximum amount of AST nodes in a single parse.
 ast_capacity = 4096
 

@@ -16,10 +16,17 @@ pub type SystemFn = fn(&mut Vm, FnArgs) -> Result<Value, Exception>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChunkId(u32);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemFnArity {
+    Unary,
+    Binary,
+    Nary,
+}
+
 #[derive(Debug, Clone)]
 pub struct System {
     /// Resolves a system function name to an index into `fn`s.
-    pub resolve_fn: fn(&str) -> Option<u8>,
+    pub resolve_fn: fn(SystemFnArity, &str) -> Option<u8>,
     pub fns: [Option<SystemFn>; 256],
     pub chunks: Vec<Chunk>,
 }
@@ -30,7 +37,7 @@ pub struct SystemImage {
 }
 
 macro_rules! def_fns {
-    ($($index:tt $name:tt => $fnref:expr),* $(,)?) => {
+    ($($index:tt $arity:tt $name:tt => $fnref:expr),* $(,)?) => {
         pub(crate) fn init_fns(system: &mut System) {
             $(
                 debug_assert!(system.fns[$index].is_none());
@@ -38,9 +45,9 @@ macro_rules! def_fns {
             )*
         }
 
-        pub(crate) fn resolve(name: &str) -> Option<u8> {
-            match name {
-                $($name => Some($index),)*
+        pub(crate) fn resolve(arity: SystemFnArity, name: &str) -> Option<u8> {
+            match (arity, name){
+                $((SystemFnArity::$arity, $name) => Some($index),)*
                 _ => None,
             }
         }
@@ -106,43 +113,44 @@ pub mod fns {
         vm::{Exception, FnArgs, Vm},
     };
 
-    use super::System;
+    use super::{System, SystemFnArity};
 
     impl System {
         def_fns! {
-            0x00 "+" => add,
-            0x01 "-" => sub,
-            0x02 "*" => mul,
-            0x03 "/" => div,
+            0x00 Binary "+" => add,
+            0x01 Binary "-" => sub,
+            0x02 Binary "*" => mul,
+            0x03 Binary "/" => div,
+            0x04 Unary "-" => neg,
 
-            0x40 "not" => not,
-            0x41 "=" => eq,
-            0x42 "<>" => neq,
-            0x43 "<" => lt,
-            0x44 "<=" => leq,
-            0x45 ">" => gt,
-            0x46 ">=" => geq,
+            0x40 Unary "!" => not,
+            0x41 Binary "==" => eq,
+            0x42 Binary "!=" => neq,
+            0x43 Binary "<" => lt,
+            0x44 Binary "<=" => leq,
+            0x45 Binary ">" => gt,
+            0x46 Binary ">=" => geq,
 
-            0x80 "vec" => vec,
-            0x81 ".x" => vec_x,
-            0x82 ".y" => vec_y,
-            0x83 ".z" => vec_z,
-            0x84 ".w" => vec_w,
+            0x80 Nary "vec" => vec,
+            0x81 Nary "vecX" => vec_x,
+            0x82 Nary "vecY" => vec_y,
+            0x83 Nary "vecZ" => vec_z,
+            0x84 Nary "vecW" => vec_w,
 
-            0x85 "rgba" => rgba,
-            0x86 ".r" => rgba_r,
-            0x87 ".g" => rgba_g,
-            0x88 ".b" => rgba_b,
-            0x89 ".a" => rgba_a,
+            0x85 Nary "rgba" => rgba,
+            0x86 Nary "rgbaR" => rgba_r,
+            0x87 Nary "rgbaG" => rgba_g,
+            0x88 Nary "rgbaB" => rgba_b,
+            0x89 Nary "rgbaA" => rgba_a,
 
-            0x90 "list" => list,
+            0x90 Nary "list" => list,
 
-            0xc0 "to-shape" => to_shape_f,
-            0xc1 "line" => line,
-            0xc2 "rect" => rect,
-            0xc3 "circle" => circle,
-            0xe0 "stroke" => stroke,
-            0xe1 "fill" => fill,
+            0xc0 Nary "toShape" => to_shape_f,
+            0xc1 Nary "line" => line,
+            0xc2 Nary "rect" => rect,
+            0xc3 Nary "circle" => circle,
+            0xe0 Nary "stroke" => stroke,
+            0xe1 Nary "fill" => fill,
         }
     }
 
@@ -194,6 +202,11 @@ pub mod fns {
         }
 
         Ok(Value::Number(result))
+    }
+
+    pub fn neg(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
+        let x = args.get_number(vm, 0, "`-` can only work with numbers")?;
+        Ok(Value::Number(-x))
     }
 
     pub fn not(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {

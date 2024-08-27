@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::system::ChunkId;
+use crate::{compiler::ClosureSpec, system::ChunkId};
 
 // TODO: Probably needs some pretty hardcore space optimization.
 // Maybe when we have static typing.
@@ -156,7 +156,23 @@ pub struct Closure {
     pub start: BytecodeLoc,
     pub name: FunctionName,
     pub param_count: u8,
+    pub local_count: u8,
     pub captures: Vec<Value>,
+}
+
+impl Closure {
+    pub fn chunk(chunk_id: ChunkId, spec: ClosureSpec) -> Self {
+        Self {
+            start: BytecodeLoc {
+                chunk_id,
+                offset: 0,
+            },
+            name: FunctionName::Anonymous,
+            param_count: 0,
+            local_count: spec.local_count,
+            captures: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

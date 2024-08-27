@@ -6,21 +6,17 @@ use core::{
 use alloc::vec::Vec;
 
 use crate::{
+    ast::{Ast, NodeId, NodeKind},
     bytecode::{Chunk, DefError, Defs, EmitError, Opcode, CAPTURE_CAPTURE, CAPTURE_LOCAL},
-    sexp::{Ast, NodeId, NodeKind, SourceCode, Span},
-    system::System,
+    diagnostic::Diagnostic,
+    source::SourceCode,
+    system::{System, SystemFnArity},
 };
 
 pub struct Source<'a> {
     pub code: &'a SourceCode,
     pub ast: &'a Ast,
     pub system: &'a System,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Diagnostic {
-    pub span: Span,
-    pub message: &'static str,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -46,6 +42,11 @@ pub struct Compiler<'a, 'b> {
     scopes: Vec<Scope<'a>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ClosureSpec {
+    pub(crate) local_count: u8,
+}
+
 impl<'a, 'b> Compiler<'a, 'b> {
     pub fn new(defs: &'a mut Defs, chunk: &'b mut Chunk) -> Self {
         Self {
@@ -59,18 +60,22 @@ impl<'a, 'b> Compiler<'a, 'b> {
         }
     }
 
-    pub fn diagnose(&mut self, diagnostic: Diagnostic) {
-        if self.diagnostics.len() >= self.diagnostics.capacity() {
-            return;
-        }
-
-        if self.diagnostics.len() == self.diagnostics.capacity() - 1 {
-            self.diagnostics.push(Diagnostic {
-                span: Span::new(0, 0),
-                message: "too many diagnostics emitted, stopping", // hello clangd!
-            })
-        } else {
+    fn emit(&mut self, diagnostic: Diagnostic) {
+        if self.diagnostics.len() < self.diagnostics.capacity() {
             self.diagnostics.push(diagnostic);
+        }
+    }
+
+    pub fn closure_spec(&self) -> ClosureSpec {
+        ClosureSpec {
+            local_count: self
+                .scopes
+                .last()
+                .unwrap()
+                .locals
+                .len()
+                .try_into()
+                .unwrap_or_default(),
         }
     }
 }
@@ -82,27 +87,51 @@ pub fn compile_expr<'a>(
     src: &Source<'a>,
     node_id: NodeId,
 ) -> CompileResult {
-    let node = src.ast.get(node_id);
-    match node.kind {
-        NodeKind::Eof => unreachable!("eof node should never be emitted"),
+    match src.ast.kind(node_id) {
+        // The nil node is special, as it inhabits node ID 0.
+        NodeKind::Nil => {
+            unreachable!("Nil node should never be emitted (ParenEmpty is used for nil literals)")
+        }
+        // Tokens are trivia and should never be emitted---they're only useful for error reporting.
+        NodeKind::Token => unreachable!("Token node should never be emitted"),
+        // Op nodes are only used to provide a searching anchor for the operator in Unary and Binary.
+        NodeKind::Op => unreachable!("Op node should never be emitted"),
+        // Params nodes are only used to provide a searching anchor for Lambda parameters.
+        NodeKind::Params => unreachable!("Param node should never be emitted"),
+        // Param nodes are only used to provide a searching anchor for identifiers in Params nodes,
+        // as they may also contain commas and other trivia.
+        NodeKind::Param => unreachable!("Param node should never be emitted"),
 
-        NodeKind::Nil => compile_nil(c),
+        NodeKind::Color => unsupported(c, src, node_id, "color literals are not implemented yet"),
+
         NodeKind::Ident => compile_ident(c, src, node_id),
         NodeKind::Number => compile_number(c, src, node_id),
-        NodeKind::List(_, _) => compile_list(c, src, node_id),
-        NodeKind::Toplevel(_) => compile_toplevel(c, src, node_id),
+        NodeKind::Tag => compile_tag(c, src, node_id),
+        NodeKind::List => unsupported(c, src, node_id, "list literals are not implemented yet"),
 
-        NodeKind::Error(message) => {
-            c.diagnose(Diagnostic {
-                span: node.span,
-                message,
-            });
-            Ok(())
-        }
+        NodeKind::Unary => compile_unary(c, src, node_id),
+        NodeKind::Binary => compile_binary(c, src, node_id),
+        NodeKind::Call => compile_call(c, src, node_id),
+        NodeKind::Paren => compile_paren(c, src, node_id),
+        NodeKind::ParenEmpty => compile_nil(c),
+        NodeKind::Lambda => compile_lambda(c, src, node_id),
+        NodeKind::If => compile_if(c, src, node_id),
+        NodeKind::Let => compile_let(c, src, node_id),
+
+        NodeKind::Toplevel => compile_toplevel(c, src, node_id),
+
+        // Error nodes are ignored, because for each error node an appropriate parser
+        // diagnostic is emitted anyways.
+        NodeKind::Error => Ok(()),
     }
 }
 
-fn compile_nil(c: &mut Compiler<'_, '_>) -> CompileResult {
+fn unsupported(c: &mut Compiler, src: &Source, node_id: NodeId, message: &str) -> CompileResult {
+    c.emit(Diagnostic::error(src.ast.span(node_id), message));
+    Ok(())
+}
+
+fn compile_nil(c: &mut Compiler) -> CompileResult {
     c.chunk.emit_opcode(Opcode::Nil)?;
 
     Ok(())
@@ -144,48 +173,39 @@ fn find_variable(
 }
 
 fn compile_ident<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
-    let ident = src.ast.get(node_id);
-    let name = ident.span.slice(src.code);
+    let span = src.ast.span(node_id);
+    let name = span.slice(src.code);
 
-    match name {
-        "false" => _ = c.chunk.emit_opcode(Opcode::False)?,
-        "true" => _ = c.chunk.emit_opcode(Opcode::True)?,
-        _ => match find_variable(c, name, c.scopes.len() - 1) {
-            Ok(Some(Variable::Local(index))) => {
-                c.chunk.emit_opcode(Opcode::Local)?;
-                c.chunk.emit_u8(index)?;
+    match find_variable(c, name, c.scopes.len() - 1) {
+        Ok(Some(Variable::Local(index))) => {
+            c.chunk.emit_opcode(Opcode::Local)?;
+            c.chunk.emit_u8(index)?;
+        }
+        Ok(Some(Variable::Captured(index))) => {
+            c.chunk.emit_opcode(Opcode::Capture)?;
+            c.chunk.emit_u8(index)?;
+        }
+        Ok(None) => {
+            if let Some(def_id) = c.defs.get(name) {
+                c.chunk.emit_opcode(Opcode::Def)?;
+                c.chunk.emit_u16(def_id.to_u16())?;
+            } else {
+                c.emit(Diagnostic::error(span, "undefined variable"));
             }
-            Ok(Some(Variable::Captured(index))) => {
-                c.chunk.emit_opcode(Opcode::Capture)?;
-                c.chunk.emit_u8(index)?;
-            }
-            Ok(None) => {
-                if let Some(def_id) = c.defs.get(name) {
-                    c.chunk.emit_opcode(Opcode::Def)?;
-                    c.chunk.emit_u16(def_id.to_u16())?;
-                } else {
-                    c.diagnose(Diagnostic {
-                        span: ident.span,
-                        message: "undefined variable",
-                    });
-                }
-            }
-            Err(CaptureError) => {
-                c.diagnose(Diagnostic {
-                    span: ident.span,
-                    message: "too many variables captured from outer functions in this scope",
-                });
-            }
-        },
-    }
+        }
+        Err(CaptureError) => {
+            c.emit(Diagnostic::error(
+                span,
+                "too many variables captured from outer functions in this scope",
+            ));
+        }
+    };
 
     Ok(())
 }
 
 fn compile_number(c: &mut Compiler<'_, '_>, src: &Source<'_>, node_id: NodeId) -> CompileResult {
-    let node = src.ast.get(node_id);
-
-    let literal = node.span.slice(src.code);
+    let literal = src.ast.span(node_id).slice(src.code);
     let float: f32 = literal
         .parse()
         .expect("the parser should've gotten us a string parsable by the stdlib");
@@ -196,48 +216,130 @@ fn compile_number(c: &mut Compiler<'_, '_>, src: &Source<'_>, node_id: NodeId) -
     Ok(())
 }
 
-fn compile_list<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
-    let NodeKind::List(function_id, args) = src.ast.get(node_id).kind else {
-        unreachable!("compile_list expects a List");
-    };
+fn compile_tag(c: &mut Compiler<'_, '_>, src: &Source, node_id: NodeId) -> CompileResult {
+    let tag = src.ast.span(node_id).slice(src.code);
 
-    let function = src.ast.get(function_id);
-    let name = function.span.slice(src.code);
-
-    if function.kind == NodeKind::Ident {
-        match name {
-            "fn" => return compile_fn(c, src, args),
-            "if" => return compile_if(c, src, args),
-            "let" => return compile_let(c, src, args),
-            _ => (),
-        };
+    match tag {
+        "False" => {
+            c.chunk.emit_opcode(Opcode::False)?;
+        }
+        "True" => {
+            c.chunk.emit_opcode(Opcode::True)?;
+        }
+        _ => {
+            c.emit(Diagnostic::error(src.ast.span(node_id), "uppercased identifiers are reserved for future use; please start your identifiers with a lowercase letter instead"));
+        }
     }
 
+    Ok(())
+}
+
+fn compile_unary<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+    let mut walk = src.ast.walk(node_id);
+    let Some(op) = walk.node() else { return Ok(()) };
+    let Some(expr) = walk.node() else {
+        return Ok(());
+    };
+
+    if src.ast.kind(op) != NodeKind::Op {
+        return Ok(());
+    }
+    let name = src.ast.span(op).slice(src.code);
+
+    compile_expr(c, src, expr)?;
+    if let Some(index) = (src.system.resolve_fn)(SystemFnArity::Unary, name) {
+        let argument_count = 1;
+        c.chunk.emit_opcode(Opcode::System)?;
+        c.chunk.emit_u8(index)?;
+        c.chunk.emit_u8(argument_count)?;
+    } else {
+        c.emit(Diagnostic::error(
+            src.ast.span(op),
+            "this unary operator is currently unimplemented",
+        ));
+    }
+
+    Ok(())
+}
+
+fn compile_binary<'a>(
+    c: &mut Compiler<'a, '_>,
+    src: &Source<'a>,
+    node_id: NodeId,
+) -> CompileResult {
+    let mut walk = src.ast.walk(node_id);
+    let Some(left) = walk.node() else {
+        return Ok(());
+    };
+    let Some(op) = walk.node() else { return Ok(()) };
+    let Some(right) = walk.node() else {
+        return Ok(());
+    };
+
+    if src.ast.kind(op) != NodeKind::Op {
+        return Ok(());
+    }
+    let name = src.ast.span(op).slice(src.code);
+
+    if name == "=" {
+        c.emit(Diagnostic::error(
+            src.ast.span(op),
+            "defs `a = b` may only appear at the top level",
+        ));
+        return Ok(());
+    }
+
+    compile_expr(c, src, left)?;
+    compile_expr(c, src, right)?;
+    if let Some(index) = (src.system.resolve_fn)(SystemFnArity::Binary, name) {
+        let argument_count = 2;
+        c.chunk.emit_opcode(Opcode::System)?;
+        c.chunk.emit_u8(index)?;
+        c.chunk.emit_u8(argument_count)?;
+    } else {
+        c.emit(Diagnostic::error(
+            src.ast.span(op),
+            "this unary operator is currently unimplemented",
+        ));
+    }
+
+    Ok(())
+}
+
+fn compile_call<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+    let mut walk = src.ast.walk(node_id);
+    let Some(func) = walk.node() else {
+        return Ok(());
+    };
+    let name = src.ast.span(func).slice(src.code);
+
     let mut argument_count = 0;
-    let mut args = args;
-    while let NodeKind::List(head, tail) = src.ast.get(args).kind {
-        compile_expr(c, src, head)?;
+    while let Some(arg) = walk.node() {
+        compile_expr(c, src, arg)?;
         argument_count += 1;
-        args = tail;
     }
 
     let argument_count = u8::try_from(argument_count).unwrap_or_else(|_| {
-        c.diagnose(Diagnostic {
-            span: src.ast.get(args).span,
-            message: "function call has too many arguments",
-        });
+        c.emit(Diagnostic::error(
+            src.ast.span(node_id),
+            "function call has too many arguments",
+        ));
         0
     });
 
-    if let (NodeKind::Ident, Some(index)) = (function.kind, (src.system.resolve_fn)(name)) {
+    if let (NodeKind::Ident, Some(index)) = (
+        src.ast.kind(func),
+        (src.system.resolve_fn)(SystemFnArity::Nary, name),
+    ) {
         c.chunk.emit_opcode(Opcode::System)?;
         c.chunk.emit_u8(index)?;
         c.chunk.emit_u8(argument_count)?;
     } else {
         // This is a bit of an oddity: we only emit the function expression _after_ the arguments,
         // but since the language is effectless this doesn't matter in practice.
-        // It makes for less code in the compiler and the VM.
-        compile_expr(c, src, function_id)?;
+        // It makes for a bit less code in the VM, since there's no need to find the function
+        // down the stack - it's always on top.
+        compile_expr(c, src, func)?;
         c.chunk.emit_opcode(Opcode::Call)?;
         c.chunk.emit_u8(argument_count)?;
     }
@@ -245,67 +347,28 @@ fn compile_list<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId)
     Ok(())
 }
 
-struct WalkList {
-    current: NodeId,
-    ok: bool,
-}
-
-impl WalkList {
-    fn new(start: NodeId) -> Self {
-        Self {
-            current: start,
-            ok: true,
-        }
-    }
-
-    fn expect_arg(
-        &mut self,
-        c: &mut Compiler<'_, '_>,
-        src: &Source<'_>,
-        message: &'static str,
-    ) -> NodeId {
-        if !self.ok {
-            return NodeId::NIL;
-        }
-
-        if let NodeKind::List(expr, tail) = src.ast.get(self.current).kind {
-            self.current = tail;
-            expr
-        } else {
-            c.diagnose(Diagnostic {
-                span: src.ast.get(self.current).span,
-                message,
-            });
-            self.ok = false;
-            NodeId::NIL
-        }
-    }
-
-    fn expect_nil(&mut self, c: &mut Compiler<'_, '_>, src: &Source<'_>, message: &'static str) {
-        if src.ast.get(self.current).kind != NodeKind::Nil {
-            c.diagnose(Diagnostic {
-                span: src.ast.get(self.current).span,
-                message,
-            });
-            // NOTE: Don't set self.ok to false, since this is not a fatal error.
-            // The nodes returned previously are valid and therefore it's safe to operate on them.
-            // Just having extra arguments shouldn't inhibit emitting additional diagnostics in
-            // the expression.
-        }
-    }
-}
-
-fn compile_if<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, args: NodeId) -> CompileResult {
-    let mut list = WalkList::new(args);
-
-    let condition = list.expect_arg(c, src, "missing `if` condition");
-    let if_true = list.expect_arg(c, src, "missing `if` true branch");
-    let if_false = list.expect_arg(c, src, "missing `if` false branch");
-    list.expect_nil(c, src, "extra arguments after `if` false branch");
-
-    if !list.ok {
+fn compile_paren<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+    let Some(inner) = src.ast.walk(node_id).node() else {
         return Ok(());
-    }
+    };
+
+    compile_expr(c, src, inner)?;
+
+    Ok(())
+}
+
+fn compile_if<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+    let mut walk = src.ast.walk(node_id);
+
+    let Some(condition) = walk.node() else {
+        return Ok(());
+    };
+    let Some(if_true) = walk.node() else {
+        return Ok(());
+    };
+    let Some(if_false) = walk.node() else {
+        return Ok(());
+    };
 
     compile_expr(c, src, condition)?;
 
@@ -328,113 +391,70 @@ fn compile_if<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, args: NodeId) -> C
     Ok(())
 }
 
-fn compile_let<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, args: NodeId) -> CompileResult {
-    let mut list = WalkList::new(args);
+fn compile_let<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+    let mut walk = src.ast.walk(node_id);
 
-    let binding_list = list.expect_arg(c, src, "missing `let` binding list ((x 1) (y 2) ...)");
-    let expr = list.expect_arg(c, src, "missing expression to `let` names into");
-    list.expect_nil(c, src, "extra arguments after `let` expression");
-
-    if !list.ok {
+    let Some(ident) = walk.node() else {
         return Ok(());
-    }
-
-    // NOTE: Our `let` behaves like `let*` from Lisps.
-    // This is because this is generally the more intuitive behaviour with how variable declarations
-    // work in traditional imperative languages.
-    // We do not offer an alternative to Lisp `let` to be as minimal as possible.
-
-    let mut current = binding_list;
-    let mut local_count: usize = 0;
-    while let NodeKind::List(head, tail) = src.ast.get(current).kind {
-        if !matches!(src.ast.get(head).kind, NodeKind::List(_, _)) {
-            c.diagnose(Diagnostic {
-                span: src.ast.get(head).span,
-                message: "`let` binding expected, like (x 1)",
-            });
-            current = tail;
-            continue;
-        }
-
-        let mut list = WalkList::new(head);
-        let ident = list.expect_arg(c, src, "binding name expected");
-        let value = list.expect_arg(c, src, "binding value expected");
-        list.expect_nil(c, src, "extra expressions after `let` binding value");
-
-        if src.ast.get(ident).kind != NodeKind::Ident {
-            c.diagnose(Diagnostic {
-                span: src.ast.get(ident).span,
-                message: "binding name must be an identifier",
-            });
-        }
-
-        // NOTE: Compile expression _before_ putting the value into scope.
-        // This is so that the variable cannot refer to itself, as it is yet to be declared.
-        compile_expr(c, src, value)?;
-
-        let name = src.ast.get(ident).span.slice(src.code);
-        let scope = c.scopes.last_mut().unwrap();
-        if scope.locals.len() >= u8::MAX as usize {
-            c.diagnose(Diagnostic {
-                span: src.ast.get(ident).span,
-                message: "too many names bound in this function at a single time",
-            });
-        } else {
-            scope.locals.push(Local { name });
-        }
-
-        local_count += 1;
-        current = tail;
-    }
+    };
+    let Some(expr) = walk.node() else {
+        return Ok(());
+    };
+    let Some(then) = walk.node() else {
+        return Ok(());
+    };
 
     compile_expr(c, src, expr)?;
-
+    let name = src.ast.span(ident).slice(src.code);
     let scope = c.scopes.last_mut().unwrap();
-    scope
-        .locals
-        .resize_with(scope.locals.len() - local_count, || unreachable!());
+    let index = if scope.locals.len() >= u8::MAX as usize {
+        c.emit(Diagnostic::error(
+            src.ast.span(ident),
+            "too many names bound in this function at a single time",
+        ));
 
-    // NOTE: If we reach more than 255 locals declared in our `let`, we should've gotten
-    // a diagnostic emitted in the `while` loop beforehand.
-    let local_count = u8::try_from(local_count).unwrap_or(0);
-    c.chunk.emit_opcode(Opcode::DropLet)?;
-    c.chunk.emit_u8(local_count)?;
+        // Don't emit the expression, because it will most likely contain errors due to this
+        // `let` failing.
+        return Ok(());
+    } else {
+        let index = scope.locals.len();
+        scope.locals.push(Local { name });
+        index as u8
+    };
+    c.chunk.emit_opcode(Opcode::SetLocal)?;
+    c.chunk.emit_u8(index)?;
+
+    compile_expr(c, src, then)?;
 
     Ok(())
 }
 
-fn compile_fn<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, args: NodeId) -> CompileResult {
-    let mut list = WalkList::new(args);
-
-    let param_list = list.expect_arg(c, src, "missing function parameters");
-    let body = list.expect_arg(c, src, "missing function body");
-    list.expect_nil(c, src, "extra arguments after function body");
-
-    if !list.ok {
+fn compile_lambda<'a>(
+    c: &mut Compiler<'a, '_>,
+    src: &Source<'a>,
+    node_id: NodeId,
+) -> CompileResult {
+    let mut walk = src.ast.walk(node_id);
+    let Some(params) = walk.node() else {
         return Ok(());
-    }
+    };
+    let Some(body) = walk.node() else {
+        return Ok(());
+    };
 
     let mut locals = Vec::new();
-    let mut current = param_list;
-    while let NodeKind::List(ident, tail) = src.ast.get(current).kind {
-        if let NodeKind::Ident = src.ast.get(ident).kind {
-            locals.push(Local {
-                name: src.ast.get(ident).span.slice(src.code),
-            })
-        } else {
-            c.diagnose(Diagnostic {
-                span: src.ast.get(ident).span,
-                message: "function parameters must be identifiers",
-            })
-        }
-        current = tail;
+    let mut params_walk = src.ast.walk(params);
+    while let Some(param) = params_walk.node() {
+        locals.push(Local {
+            name: src.ast.span(param).slice(src.code),
+        });
     }
 
     let param_count = u8::try_from(locals.len()).unwrap_or_else(|_| {
-        c.diagnose(Diagnostic {
-            span: src.ast.get(param_list).span,
-            message: "too many function parameters",
-        });
+        c.emit(Diagnostic::error(
+            src.ast.span(params),
+            "too many function parameters",
+        ));
         0
     });
 
@@ -453,13 +473,21 @@ fn compile_fn<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, args: NodeId) -> C
     c.chunk.patch_u16(after_offset, after);
 
     let scope = c.scopes.pop().unwrap();
-    let capture_count = u8::try_from(scope.captures.len()).unwrap_or_else(|_| {
-        c.diagnose(Diagnostic {
-            span: src.ast.get(body).span,
-            message: "function refers to too many variables from the outer function",
-        });
+    let local_count = u8::try_from(scope.locals.len()).unwrap_or_else(|_| {
+        c.emit(Diagnostic::error(
+            src.ast.span(body),
+            "function contains too many local variables",
+        ));
         0
     });
+    let capture_count = u8::try_from(scope.captures.len()).unwrap_or_else(|_| {
+        c.emit(Diagnostic::error(
+            src.ast.span(body),
+            "function refers to too many variables from its outer functions",
+        ));
+        0
+    });
+    c.chunk.emit_u8(local_count)?;
     c.chunk.emit_u8(capture_count)?;
     for capture in scope.captures {
         match capture {
@@ -484,31 +512,27 @@ fn compile_toplevel<'a>(
     src: &Source<'a>,
     node_id: NodeId,
 ) -> CompileResult {
-    let NodeKind::Toplevel(mut current) = src.ast.get(node_id).kind else {
-        unreachable!("compile_toplevel expects a Toplevel");
-    };
+    def_prepass(c, src, node_id)?;
 
-    def_prepass(c, src, current)?;
+    let mut walk = src.ast.walk(node_id);
+    let mut result_expr = None;
+    while let Some(toplevel_expr) = walk.node() {
+        if let Some(result_expr) = result_expr {
+            // TODO: This diagnostic should show you the expression after the result.
+            c.emit(Diagnostic::error(
+                src.ast.span(result_expr),
+                "the result value must be the last thing in the program",
+            ));
+        }
 
-    let mut had_result = false;
-    while let NodeKind::List(expr, tail) = src.ast.get(current).kind {
-        match compile_toplevel_expr(c, src, expr)? {
+        match compile_toplevel_expr(c, src, toplevel_expr)? {
             ToplevelExpr::Def => (),
-            ToplevelExpr::Result => had_result = true,
+            ToplevelExpr::Result if result_expr.is_none() => result_expr = Some(toplevel_expr),
+            ToplevelExpr::Result => (),
         }
-
-        if had_result && src.ast.get(tail).kind != NodeKind::Nil {
-            c.diagnose(Diagnostic {
-                span: src.ast.get(tail).span,
-                message: "result value may not be followed by anything else",
-            });
-            break;
-        }
-
-        current = tail;
     }
 
-    if !had_result {
+    if result_expr.is_none() {
         c.chunk.emit_opcode(Opcode::Nil)?;
     }
     c.chunk.emit_opcode(Opcode::Return)?;
@@ -516,36 +540,28 @@ fn compile_toplevel<'a>(
     Ok(())
 }
 
-fn def_prepass<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+fn def_prepass<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, toplevel: NodeId) -> CompileResult {
+    let mut walk = src.ast.walk(toplevel);
+
     // This is a bit of a pattern matching tapeworm, but Rust unfortunately doesn't have `if let`
     // chains yet to make this more readable.
-    let mut current = node_id;
-    while let NodeKind::List(expr, tail) = src.ast.get(current).kind {
-        if let NodeKind::List(head_id, tail_id) = src.ast.get(expr).kind {
-            let head = src.ast.get(head_id);
-            let name = head.span.slice(src.code);
-            if head.kind == NodeKind::Ident && name == "def" {
-                if let NodeKind::List(ident_id, _) = src.ast.get(tail_id).kind {
-                    let ident = src.ast.get(ident_id);
-                    if ident.kind == NodeKind::Ident {
-                        let name = ident.span.slice(src.code);
-                        match c.defs.add(name) {
-                            Ok(_) => (),
-                            Err(DefError::Exists) => c.diagnose(Diagnostic {
-                                span: ident.span,
-                                message: "redefinitions of defs are not allowed",
-                            }),
-                            Err(DefError::OutOfSpace) => c.diagnose(Diagnostic {
-                                span: ident.span,
-                                message: "too many defs",
-                            }),
-                        }
+    while let Some(binary) = walk.node_of(NodeKind::Binary) {
+        let mut binary_walk = src.ast.walk(binary);
+        if let (Some(ident), Some(op)) = (binary_walk.node(), binary_walk.get(NodeKind::Op)) {
+            if src.ast.span(op).slice(src.code) == "=" {
+                let name = src.ast.span(ident).slice(src.code);
+                match c.defs.add(name) {
+                    Ok(_) => (),
+                    Err(DefError::Exists) => c.emit(Diagnostic::error(
+                        src.ast.span(ident),
+                        "a def with this name already exists",
+                    )),
+                    Err(DefError::OutOfSpace) => {
+                        c.emit(Diagnostic::error(src.ast.span(binary), "too many defs"))
                     }
                 }
             }
         }
-
-        current = tail;
     }
 
     Ok(())
@@ -562,14 +578,10 @@ fn compile_toplevel_expr<'a>(
     src: &Source<'a>,
     node_id: NodeId,
 ) -> CompileResult<ToplevelExpr> {
-    let node = src.ast.get(node_id);
-
-    if let NodeKind::List(head_id, tail_id) = node.kind {
-        let head = src.ast.get(head_id);
-        if head.kind == NodeKind::Ident {
-            let name = head.span.slice(src.code);
-            if name == "def" {
-                compile_def(c, src, tail_id)?;
+    if src.ast.kind(node_id) == NodeKind::Binary {
+        if let Some(op) = src.ast.walk(node_id).get(NodeKind::Op) {
+            if src.ast.span(op).slice(src.code) == "=" {
+                compile_def(c, src, node_id)?;
                 return Ok(ToplevelExpr::Def);
             }
         }
@@ -579,24 +591,32 @@ fn compile_toplevel_expr<'a>(
     Ok(ToplevelExpr::Result)
 }
 
-fn compile_def<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, args: NodeId) -> CompileResult {
-    let mut list = WalkList::new(args);
-
-    let ident = list.expect_arg(c, src, "missing definition name");
-    let value = list.expect_arg(c, src, "missing definition value");
-    list.expect_nil(c, src, "extra arguments after definition");
-
-    if !list.ok {
+fn compile_def<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+    let mut walk = src.ast.walk(node_id);
+    let Some(left) = walk.node() else {
         return Ok(());
+    };
+    let Some(_op) = walk.node() else {
+        return Ok(());
+    };
+    let Some(right) = walk.node() else {
+        return Ok(());
+    };
+
+    if src.ast.kind(left) != NodeKind::Ident {
+        c.emit(Diagnostic::error(
+            src.ast.span(left),
+            "def name (identifier) expected",
+        ));
     }
 
-    let name = src.ast.get(ident).span.slice(src.code);
+    let name = src.ast.span(left).slice(src.code);
     // NOTE: def_prepass collects all definitions beforehand.
     // In case a def ends up not existing, that means we ran out of space for defs - so emit a
     // zero def instead.
     let def_id = c.defs.get(name).unwrap_or_default();
 
-    compile_expr(c, src, value)?;
+    compile_expr(c, src, right)?;
     c.chunk.emit_opcode(Opcode::SetDef)?;
     c.chunk.emit_u16(def_id.to_u16())?;
 

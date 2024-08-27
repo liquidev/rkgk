@@ -2,18 +2,23 @@
 
 extern crate alloc;
 
-use core::{alloc::Layout, slice};
+use core::{alloc::Layout, num::Saturating, slice};
 
 use alloc::{boxed::Box, vec::Vec};
 use haku::{
+    ast::Ast,
     bytecode::{Chunk, Defs, DefsImage},
-    compiler::{compile_expr, CompileError, Compiler, Diagnostic, Source},
+    compiler::{compile_expr, CompileError, Compiler, Source},
+    diagnostic::Diagnostic,
+    lexer::{lex, Lexer},
+    parser::{self, Parser},
     render::{
         tiny_skia::{Pixmap, PremultipliedColorU8},
         Renderer, RendererLimits,
     },
-    sexp::{parse_toplevel, Ast, Parser, SourceCode},
+    source::SourceCode,
     system::{ChunkId, System, SystemImage},
+    token::Lexis,
     value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
     vm::{Exception, Vm, VmImage, VmLimits},
 };
@@ -41,6 +46,8 @@ struct Limits {
     max_source_code_len: usize,
     max_chunks: usize,
     max_defs: usize,
+    max_tokens: usize,
+    max_parser_events: usize,
     ast_capacity: usize,
     chunk_capacity: usize,
     stack_capacity: usize,
@@ -58,6 +65,8 @@ impl Default for Limits {
             max_source_code_len: 65536,
             max_chunks: 2,
             max_defs: 256,
+            max_tokens: 1024,
+            max_parser_events: 1024,
             ast_capacity: 1024,
             chunk_capacity: 65536,
             stack_capacity: 1024,
@@ -101,6 +110,8 @@ macro_rules! limit_setter {
 limit_setter!(max_source_code_len);
 limit_setter!(max_chunks);
 limit_setter!(max_defs);
+limit_setter!(max_tokens);
+limit_setter!(max_parser_events);
 limit_setter!(ast_capacity);
 limit_setter!(chunk_capacity);
 limit_setter!(stack_capacity);
@@ -207,6 +218,8 @@ unsafe extern "C" fn haku_exception_message_len(instance: *const Instance) -> u3
 enum StatusCode {
     Ok,
     SourceCodeTooLong,
+    TooManyTokens,
+    TooManyAstNodes,
     ChunkTooBig,
     DiagnosticsEmitted,
     TooManyChunks,
@@ -238,6 +251,8 @@ extern "C" fn haku_status_string(code: StatusCode) -> *const i8 {
     match code {
         StatusCode::Ok => c"ok",
         StatusCode::SourceCodeTooLong => c"source code is too long",
+        StatusCode::TooManyTokens => c"source code has too many tokens",
+        StatusCode::TooManyAstNodes => c"source code has too many AST nodes",
         StatusCode::ChunkTooBig => c"compiled bytecode is too large",
         StatusCode::DiagnosticsEmitted => c"diagnostics were emitted",
         StatusCode::TooManyChunks => c"too many registered bytecode chunks",
@@ -281,22 +296,22 @@ unsafe extern "C" fn haku_num_diagnostics(brush: *const Brush) -> u32 {
 
 #[no_mangle]
 unsafe extern "C" fn haku_diagnostic_start(brush: *const Brush, index: u32) -> u32 {
-    (*brush).diagnostics[index as usize].span.start as u32
+    (*brush).diagnostics[index as usize].span().start
 }
 
 #[no_mangle]
 unsafe extern "C" fn haku_diagnostic_end(brush: *const Brush, index: u32) -> u32 {
-    (*brush).diagnostics[index as usize].span.end as u32
+    (*brush).diagnostics[index as usize].span().end
 }
 
 #[no_mangle]
 unsafe extern "C" fn haku_diagnostic_message(brush: *const Brush, index: u32) -> *const u8 {
-    (*brush).diagnostics[index as usize].message.as_ptr()
+    (*brush).diagnostics[index as usize].message().as_ptr()
 }
 
 #[no_mangle]
 unsafe extern "C" fn haku_diagnostic_message_len(brush: *const Brush, index: u32) -> u32 {
-    (*brush).diagnostics[index as usize].message.len() as u32
+    (*brush).diagnostics[index as usize].message().len() as u32
 }
 
 #[no_mangle]
@@ -315,15 +330,27 @@ unsafe extern "C" fn haku_compile_brush(
 
     let code = core::str::from_utf8(slice::from_raw_parts(code, code_len as usize))
         .expect("invalid UTF-8");
-    let code = match SourceCode::limited_len(code, instance.limits.max_source_code_len) {
-        Some(code) => code,
-        None => return StatusCode::SourceCodeTooLong,
+    let Some(code) = SourceCode::limited_len(code, instance.limits.max_source_code_len as u32)
+    else {
+        return StatusCode::SourceCodeTooLong;
     };
 
-    let ast = Ast::new(instance.limits.ast_capacity);
-    let mut parser = Parser::new(ast, code);
-    let root = parse_toplevel(&mut parser);
-    let ast = parser.ast;
+    let mut lexer = Lexer::new(Lexis::new(instance.limits.max_tokens), code);
+    if lex(&mut lexer).is_err() {
+        return StatusCode::TooManyTokens;
+    };
+
+    let mut ast = Ast::new(instance.limits.ast_capacity);
+    let mut parser = Parser::new(
+        &lexer.lexis,
+        &haku::parser::ParserLimits {
+            max_events: instance.limits.max_parser_events,
+        },
+    );
+    parser::toplevel(&mut parser);
+    let Ok((root, mut parser_diagnostics)) = parser.into_ast(&mut ast) else {
+        return StatusCode::TooManyAstNodes;
+    };
 
     let src = Source {
         code,
@@ -339,8 +366,11 @@ unsafe extern "C" fn haku_compile_brush(
         }
     }
 
-    if !compiler.diagnostics.is_empty() {
-        brush.diagnostics = compiler.diagnostics;
+    let mut diagnostics = lexer.diagnostics;
+    diagnostics.append(&mut parser_diagnostics);
+    diagnostics.append(&mut compiler.diagnostics);
+    if !diagnostics.is_empty() {
+        brush.diagnostics = diagnostics;
         return StatusCode::DiagnosticsEmitted;
     }
 

@@ -1,71 +1,31 @@
-// NOTE: This is a very bad CLI.
-// Sorry!
+// NOTE: This is a very bad CLI. I only use it for debugging haku with LLDB.
+// Sorry that it doesn't actually do anything!
 
 use std::{error::Error, fmt::Display, io::BufRead};
 
 use haku::{
-    bytecode::{Chunk, Defs},
-    compiler::{compile_expr, Compiler, Source},
-    sexp::{parse_toplevel, Ast, Parser, SourceCode},
-    system::System,
-    value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
-    vm::{Vm, VmLimits},
+    ast::{dump::dump, Ast},
+    lexer::{lex, Lexer},
+    parser::{expr, Parser, ParserLimits},
+    source::SourceCode,
+    token::Lexis,
+    value::Value,
 };
 
 fn eval(code: &str) -> Result<Value, Box<dyn Error>> {
-    let mut system = System::new(1);
-
-    let ast = Ast::new(1024);
     let code = SourceCode::unlimited_len(code);
-    let mut parser = Parser::new(ast, code);
-    let root = parse_toplevel(&mut parser);
-    let ast = parser.ast;
-    let src = Source {
-        code,
-        ast: &ast,
-        system: &system,
-    };
+    let mut lexer = Lexer::new(Lexis::new(1024), code);
+    lex(&mut lexer).expect("too many tokens");
 
-    let mut defs = Defs::new(256);
-    let mut chunk = Chunk::new(65536).unwrap();
-    let mut compiler = Compiler::new(&mut defs, &mut chunk);
-    compile_expr(&mut compiler, &src, root)?;
-    let diagnostics = compiler.diagnostics;
-    let defs = compiler.defs;
-    println!("{chunk:?}");
+    let mut parser = Parser::new(&lexer.lexis, &ParserLimits { max_events: 1024 });
+    expr(&mut parser);
 
-    for diagnostic in &diagnostics {
-        eprintln!(
-            "{}..{}: {}",
-            diagnostic.span.start, diagnostic.span.end, diagnostic.message
-        );
-    }
+    let mut ast = Ast::new(1024);
+    let (root, _) = parser.into_ast(&mut ast).unwrap();
 
-    if !diagnostics.is_empty() {
-        return Err(Box::new(DiagnosticsEmitted));
-    }
+    eprintln!("{}", dump(&ast, root, Some(code)));
 
-    let mut vm = Vm::new(
-        defs,
-        &VmLimits {
-            stack_capacity: 256,
-            call_stack_capacity: 256,
-            ref_capacity: 256,
-            fuel: 32768,
-            memory: 1024,
-        },
-    );
-    let chunk_id = system.add_chunk(chunk)?;
-    let closure = vm.create_ref(Ref::Closure(Closure {
-        start: BytecodeLoc {
-            chunk_id,
-            offset: 0,
-        },
-        name: FunctionName::Anonymous,
-        param_count: 0,
-        captures: Vec::new(),
-    }))?;
-    Ok(vm.run(&system, closure)?)
+    Ok(Value::Nil)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

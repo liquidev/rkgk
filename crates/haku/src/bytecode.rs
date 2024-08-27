@@ -17,6 +17,8 @@ pub enum Opcode {
     // Duplicate existing values.
     /// Push a value relative to the bottom of the current stack window.
     Local, // (index: u8)
+    /// Set the value of a value relative to the bottom of the current stack window.
+    SetLocal, // (index: u8)
     /// Push a captured value.
     Capture, // (index: u8)
     /// Get the value of a definition.
@@ -24,12 +26,8 @@ pub enum Opcode {
     /// Set the value of a definition.
     SetDef, // (index: u16)
 
-    /// Drop `number` values from the stack.
-    /// <!-- OwO -->
-    DropLet, // (number: u8)
-
     // Create literal functions.
-    Function, // (params: u8, then: u16), at `then`: (capture_count: u8, captures: [(source: u8, index: u8); capture_count])
+    Function, // (params: u8, then: u16), at `then`: (local_count: u8, capture_count: u8, captures: [(source: u8, index: u8); capture_count])
 
     // Control flow.
     Jump,      // (offset: u16)

@@ -123,8 +123,9 @@ impl Vm {
 
     fn push(&mut self, value: Value) -> Result<(), Exception> {
         if self.stack.len() >= self.stack.capacity() {
-            // TODO: can this error message be made clearer?
-            return Err(self.create_exception("too many local variables"));
+            return Err(self.create_exception(
+                "too many temporary values (local variables and expression operands)",
+            ));
         }
         self.stack.push(value);
         Ok(())
@@ -134,6 +135,14 @@ impl Vm {
         self.stack.get(index).copied().ok_or_else(|| {
             self.create_exception("corrupted bytecode (local variable out of bounds)")
         })
+    }
+
+    fn get_mut(&mut self, index: usize) -> Result<&mut Value, Exception> {
+        if self.stack.get(index).is_some() {
+            Ok(&mut self.stack[index])
+        } else {
+            Err(self.create_exception("corrupted bytecode (set local variable out of bounds)"))
+        }
     }
 
     fn pop(&mut self) -> Result<Value, Exception> {
@@ -168,6 +177,11 @@ impl Vm {
         let mut bottom = self.stack.len();
         let mut fuel = self.fuel;
 
+        let init_bottom = bottom;
+        for _ in 0..closure.local_count {
+            self.push(Value::Nil)?;
+        }
+
         #[allow(unused)]
         let closure = (); // Do not use `closure` after this! Use `get_ref` on `closure_id` instead.
 
@@ -200,6 +214,12 @@ impl Vm {
                     self.push(value)?;
                 }
 
+                Opcode::SetLocal => {
+                    let index = chunk.read_u8(&mut pc)? as usize;
+                    let new_value = self.pop()?;
+                    *self.get_mut(index)? = new_value;
+                }
+
                 Opcode::Capture => {
                     let index = chunk.read_u8(&mut pc)? as usize;
                     let closure = self.get_ref(closure_id).as_closure().unwrap();
@@ -226,25 +246,13 @@ impl Vm {
                     }
                 }
 
-                Opcode::DropLet => {
-                    let count = chunk.read_u8(&mut pc)? as usize;
-                    if count != 0 {
-                        let new_len = self.stack.len().checked_sub(count).ok_or_else(|| {
-                            self.create_exception(
-                            "corrupted bytecode (Drop tried to drop too many values off the stack)",
-                        )
-                        })?;
-                        let value = self.pop()?;
-                        self.stack.resize_with(new_len, || unreachable!());
-                        self.push(value)?;
-                    }
-                }
-
                 Opcode::Function => {
                     let param_count = chunk.read_u8(&mut pc)?;
                     let then = chunk.read_u16(&mut pc)? as usize;
                     let body = pc;
                     pc = then;
+
+                    let local_count = chunk.read_u8(&mut pc)?;
 
                     let capture_count = chunk.read_u8(&mut pc)? as usize;
                     let mut captures = Vec::with_capacity(capture_count);
@@ -272,6 +280,7 @@ impl Vm {
                         },
                         name: FunctionName::Anonymous,
                         param_count,
+                        local_count,
                         captures,
                     }))?;
                     self.push(Value::Ref(id))?;
@@ -327,6 +336,11 @@ impl Vm {
                             )
                         })?;
 
+                    // NOTE: Locals are only pushed _after_ we do any stack calculations.
+                    for _ in 0..closure.local_count {
+                        self.push(Value::Nil)?;
+                    }
+
                     self.push_call(frame)?;
                 }
 
@@ -381,10 +395,13 @@ impl Vm {
             }
         }
 
-        Ok(self
+        let result = self
             .stack
             .pop()
-            .expect("there should be a result at the top of the stack"))
+            .expect("there should be a result at the top of the stack");
+        self.stack.resize_with(init_bottom, || unreachable!());
+
+        Ok(result)
     }
 
     fn store_context(&mut self, context: Context) {

@@ -5,11 +5,15 @@
 
 use eyre::{bail, Context, OptionExt};
 use haku::{
+    ast::Ast,
     bytecode::{Chunk, Defs, DefsImage},
     compiler::{Compiler, Source},
+    lexer::{lex, Lexer},
+    parser::{self, Parser, ParserLimits},
     render::{tiny_skia::Pixmap, Renderer, RendererLimits},
-    sexp::{Ast, Parser, SourceCode},
+    source::SourceCode,
     system::{ChunkId, System, SystemImage},
+    token::Lexis,
     value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
     vm::{Vm, VmImage, VmLimits},
 };
@@ -22,9 +26,11 @@ use crate::schema::Vec2;
 // because we do some dynamic typing magic over on the JavaScript side to automatically call all
 // the appropriate functions for setting these limits on the client side.
 pub struct Limits {
-    pub max_source_code_len: usize,
+    pub max_source_code_len: u32,
     pub max_chunks: usize,
     pub max_defs: usize,
+    pub max_tokens: usize,
+    pub max_parser_events: usize,
     pub ast_capacity: usize,
     pub chunk_capacity: usize,
     pub stack_capacity: usize,
@@ -88,12 +94,21 @@ impl Haku {
     pub fn set_brush(&mut self, code: &str) -> eyre::Result<()> {
         self.reset();
 
-        let ast = Ast::new(self.limits.ast_capacity);
         let code = SourceCode::limited_len(code, self.limits.max_source_code_len)
             .ok_or_eyre("source code is too long")?;
-        let mut parser = Parser::new(ast, code);
-        let root = haku::sexp::parse_toplevel(&mut parser);
-        let ast = parser.ast;
+
+        let mut lexer = Lexer::new(Lexis::new(self.limits.max_tokens), code);
+        lex(&mut lexer)?;
+
+        let mut parser = Parser::new(
+            &lexer.lexis,
+            &ParserLimits {
+                max_events: self.limits.max_parser_events,
+            },
+        );
+        parser::toplevel(&mut parser);
+        let mut ast = Ast::new(self.limits.ast_capacity);
+        let (root, parser_diagnostics) = parser.into_ast(&mut ast)?;
 
         let src = Source {
             code,
@@ -107,7 +122,10 @@ impl Haku {
         haku::compiler::compile_expr(&mut compiler, &src, root)
             .context("failed to compile the chunk")?;
 
-        if !compiler.diagnostics.is_empty() {
+        if !lexer.diagnostics.is_empty()
+            || !parser_diagnostics.is_empty()
+            || !compiler.diagnostics.is_empty()
+        {
             bail!("diagnostics were emitted");
         }
 

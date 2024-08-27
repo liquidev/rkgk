@@ -44,7 +44,9 @@ With that said, there are several types of values in haku that can be passed int
 - `fn` - a function, as returned by `(fn (x) x)` literals.
 - `list` - a list of values, where each value can have a different type (even `list` itself.)
 - `shape` - a mathematical shape.
+
   - `shape-like` - anything that can be turned into a `shape` using `to-shape`.
+
 - `scribble` - something that can be drawn on the wall.
 
 Additionally, the syntax `(type-a type-b ...)` may be used to signify that one of the listed types is accepted or returned. 
@@ -122,8 +124,10 @@ Whether two values are considered equal depends on their type:
 
 - If the type of the two values differs, `false` is returned.
 - If the two values are `number`s:
+
   - If any of the values are `NaN`, `false` is returned.
   - Otherwise `true` is returned if the two numbers have the exact same bit representation.
+
 - If the two values are `vec`s, `true` is returned if each of their `number` components is equal to each other using the rules above.
 - Likewise with `rgba`s.
 - All other types of values use _reference_ equality - `true` is returned only if `a` and `b` are located in the same place in memory.

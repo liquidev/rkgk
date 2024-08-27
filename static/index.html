@@ -24,6 +24,19 @@
         <script src="static/welcome.js" type="module"></script>        
         
         <script src="static/index.js" type="module" defer></script>
+
+        <link rel="icon" sizes="16x16" href="/static/favicon/rkgk@1x.png">
+        <link rel="icon" sizes="32x32" href="/static/favicon/rkgk@2x.png">
+        <link rel="icon" sizes="64x64" href="/static/favicon/rkgk@4x.png">
+        <link rel="icon" sizes="128x128" href="/static/favicon/rkgk@8x.png">
+        <link rel="icon" sizes="256x256" href="/static/favicon/rkgk@16x.png">
+        <link rel="icon" sizes="512x512" href="/static/favicon/rkgk@32x.png">
+        <link rel="apple-touch-icon" sizes="16x16" href="/static/favicon/rkgk@1x.png">
+        <link rel="apple-touch-icon" sizes="32x32" href="/static/favicon/rkgk@2x.png">
+        <link rel="apple-touch-icon" sizes="64x64" href="/static/favicon/rkgk@4x.png">
+        <link rel="apple-touch-icon" sizes="128x128" href="/static/favicon/rkgk@8x.png">
+        <link rel="apple-touch-icon" sizes="256x256" href="/static/favicon/rkgk@16x.png">
+        <link rel="apple-touch-icon" sizes="512x512" href="/static/favicon/rkgk@32x.png">
     </head>
 
     <body>
@@ -31,6 +44,11 @@
             <rkgk-canvas-renderer class="fullscreen"></rkgk-canvas-renderer>
             <rkgk-reticle-renderer class="fullscreen"></rkgk-reticle-renderer>
             <div class="panels fullscreen">
+                <div class="rkgk-panel menu-bar">
+                    <a class="icon icon-rkgk-grayscale" title="I know this menu bar is really ugly. Sorry about that."></a>
+                    <hr>
+                    <a href="/docs/rkgk.html">Manual</a>
+                </div>
                 <rkgk-brush-editor></rkgk-brush-editor>
             </div>
 

@@ -10,9 +10,6 @@
     --color-panel-background: #fff;
     --color-shaded-background: rgba(0, 0, 0, 5%);
 
-    --panel-border-radius: 16px;
-    --panel-box-shadow: 0 0 0 1px var(--color-panel-border);
-    --panel-padding: 12px;
     --dialog-backdrop: rgba(255, 255, 255, 0.5);
 }
 
@@ -102,7 +99,7 @@ input {
 }
 
 *:focus {
-    outline: 1px solid #40b1f4;
+    outline: 1px solid var(--color-brand-blue);
     outline-offset: 4px;
 }
 
@@ -164,12 +161,15 @@ rkgk-throbber {
 /* Panels */
 
 .rkgk-panel {
+    --panel-border-radius: 8px;
+    
     display: block;
     background: var(--color-panel-background);
-    padding: var(--panel-border-radius);
     border: none;
-    border-radius: 16px;
-    box-shadow: var(--panel-box-shadow);
+    border-radius: var(--panel-border-radius);
+    box-shadow:
+        0 0 0 1px var(--color-panel-border);
+        /* 4px 4px 0 0 var(--color-panel-border); */
     box-sizing: border-box;
 }
 
@@ -192,5 +192,25 @@ pre:has(code) {
     background-color: var(--color-shaded-background);
     border-radius: 8px;
     padding: 1em 1em;
+}
+
+/* Icons */
+
+:root {
+    --icon-rkgk-grayscale: url('data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjE2IiB2aWV3Qm94PSIwIDAgMTYgMTYiIHdpZHRoPSIxNiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayI+PGNsaXBQYXRoIGlkPSJhIj48cGF0aCBkPSJtMCAwaDE2djE2aC0xNnoiLz48L2NsaXBQYXRoPjxnIGNsaXAtcGF0aD0idXJsKCNhKSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIGQ9Im0xMiAxNy00LjU1Mjc5LTkuMTA1NTdjLS42NjQ5LTEuMzI5ODEuMzAyMDktMi44OTQ0MyAxLjc4ODg2LTIuODk0NDNoOC43NjM5MyIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxnIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHBhdGggZD0ibTUuNSAxMi0yLjUgNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLW9wYWNpdHk9Ii41Ii8+PHBhdGggZD0ibTMgNWgxIi8+PC9nPjwvZz48L3N2Zz4=');
+    --icon-external-link: url('data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjE2IiB2aWV3Qm94PSIwIDAgMTYgMTYiIHdpZHRoPSIxNiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBzdHJva2U9IiMwMDAiPjxwYXRoIGQ9Im0xMC41IDl2Mi41aC02di02aDIuNSIvPjxwYXRoIGQ9Im03IDkgNC41LTQuNW0wIDBoLTMuNW0zLjUgMHYzLjUiLz48L2c+PC9zdmc+');
+}
+
+.icon {
+    display: inline-block;
+    vertical-align: middle;
+    width: 16px;
+    height: 16px;
+
+    background-repeat: no-repeat;
+    background-position: 50% 50%;
+
+    &.icon-rkgk-grayscale { background-image: var(--icon-rkgk-grayscale); }
+    &.icon-external-link { background-image: var(--icon-external-link); }
 }
 

@@ -201,6 +201,7 @@ rkgk-connection-status {
     --border-radius: 4px;
     
     display: flex;
+    align-items: center;
     box-sizing: border-box;
 
     width: fit-content;
@@ -213,6 +214,8 @@ rkgk-connection-status {
         color: var(--color-text);
         padding: 4px 8px;
         text-decoration: none;
+
+        line-height: 1;
 
         &:hover {
             background-color: var(--color-shaded-background);

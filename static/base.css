@@ -18,56 +18,57 @@
 body {
     margin: 0;
     color: var(--color-text);
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
 /* Fonts */
 
 @font-face {
-    font-family: "Fira Sans";
+    font-family: "Atkinson Hyperlegible";
     src:
-        local("Fira Sans Regular"),
-        url("font/FiraSans-Regular.ttf");
+        local("Atkinson Hyperlegible Regular"),
+        url("font/AtkinsonHyperlegible-Regular.ttf");
     font-weight: 400;
 }
 
 @font-face {
-    font-family: "Fira Sans";
+    font-family: "Atkinson Hyperlegible";
     src:
-        local("Fira Sans Italic"),
-        url("font/FiraSans-Italic.ttf");
+        local("Atkinson Hyperlegible Italic"),
+        url("font/AtkinsonHyperlegible-Italic.ttf");
     font-weight: 400;
     font-style: italic;
 }
 
 @font-face {
-    font-family: "Fira Sans";
+    font-family: "Atkinson Hyperlegible";
     src:
-        local("Fira Sans Bold"),
-        url("font/FiraSans-Bold.ttf");
+        local("Atkinson Hyperlegible Bold"),
+        url("font/AtkinsonHyperlegible-Bold.ttf");
     font-weight: 700;
 }
 
 @font-face {
-    font-family: "Fira Sans";
+    font-family: "Atkinson Hyperlegible";
     src:
-        local("Fira Sans Bold Italic"),
-        url("font/FiraSans-BoldItalic.ttf");
+        local("Atkinson Hyperlegible Bold Italic"),
+        url("font/AtkinsonHyperlegible-BoldItalic.ttf");
     font-weight: 700;
     font-style: italic;
 }
 
 @font-face {
-    font-family: "Fira Code";
+    /* NOTE: This is my own variant of Iosevka that more or less follows the stylistic choices
+       of Atkinson Hyperlegible. */
+    font-family: "Iosevka Hyperlegible";
     src:
-        local("Fira Code"),
-        url("font/FiraCode-VariableFont_wght.ttf");
+        local("Iosevka Hyperlegible"),
+        url("font/IosevkaHyperlegible-Regular.woff2");
     font-weight: 400;
 }
 
 :root {
-    font-size: 87.5%;
-    font-family: "Fira Sans", sans-serif;
+    font-family: "Atkinson Hyperlegible", sans-serif;
 }
 
 button, textarea, input {
@@ -76,7 +77,8 @@ button, textarea, input {
 }
 
 pre, code, textarea {
-    font-family: "Fira Code", monospace;    
+    font-family: "Iosevka Hyperlegible", monospace;
+    line-height: 1.5;
 }
 
 /* Buttons */

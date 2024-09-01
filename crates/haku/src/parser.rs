@@ -228,6 +228,7 @@ impl Event {
     fn new(kind: EventKind) -> Event {
         Event {
             kind,
+            #[cfg(debug_assertions)]
             from: core::panic::Location::caller(),
         }
     }
@@ -235,14 +236,24 @@ impl Event {
 
 impl fmt::Debug for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:?} @ {}:{}:{}",
-            self.kind,
-            self.from.file(),
-            self.from.line(),
-            self.from.column()
-        )
+        #[cfg(debug_assertions)]
+        {
+            write!(
+                f,
+                "{:?} @ {}:{}:{}",
+                self.kind,
+                self.from.file(),
+                self.from.line(),
+                self.from.column()
+            )?;
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            write!(f, "{:?}", self.kind,)?;
+        }
+
+        Ok(())
     }
 }
 

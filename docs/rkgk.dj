@@ -23,12 +23,11 @@ Or tangled into text, if you're reading this on a mobile device.
 In case you edited anything in the input box on the right, paste the following text into it before continuing:
 
 ```haku
-; This is your brush.
-; Feel free to edit it to your liking!
-(stroke
-  8                       ; thickness
-  (rgba 0.0 0.0 0.0 1.0)  ; color
-  (vec))                  ; position
+-- This is your brush.
+-- Try playing around with the numbers,
+-- and see what happens!
+
+stroke 8 (rgba 0 0 0 1) (vec 0 0)
 ```
 
 rakugaki is a drawing program for digital scribbles and other pieces of art.

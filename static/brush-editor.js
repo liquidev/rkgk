@@ -1,10 +1,9 @@
 const defaultBrush = `
-; This is your brush.
-; Feel free to edit it to your liking!
-(stroke
-  8                       ; thickness
-  (rgba 0.0 0.0 0.0 1.0)  ; color
-  (vec))                  ; position
+-- This is your brush.
+-- Try playing around with the numbers,
+-- and see what happens!
+
+stroke 8 (rgba 0 0 0 1) (vec 0 0)
 `.trim();
 
 export class BrushEditor extends HTMLElement {

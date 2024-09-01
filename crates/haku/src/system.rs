@@ -144,6 +144,7 @@ pub mod fns {
             0x89 Nary "rgbaA" => rgba_a,
 
             // NOTE: Not used right now, has been replaced with Opcode::List.
+            // Keeping it around to reserve a slot for data structure operations.
             0x90 Nary "list (unused)" => list,
 
             0xc0 Nary "toShape" => to_shape_f,
@@ -156,53 +157,27 @@ pub mod fns {
     }
 
     pub fn add(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        let mut result = 0.0;
-        for i in 0..args.num() {
-            result += args.get_number(vm, i, "arguments to (+) must be numbers")?;
-        }
-        Ok(Value::Number(result))
+        let a = args.get_number(vm, 0, "arguments to `+` must be numbers")?;
+        let b = args.get_number(vm, 1, "arguments to `+` must be numbers")?;
+        Ok(Value::Number(a + b))
     }
 
     pub fn sub(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() < 1 {
-            return Err(vm.create_exception("(-) requires at least one argument to subtract from"));
-        }
-
-        static ERROR: &str = "arguments to (-) must be numbers";
-
-        if args.num() == 1 {
-            Ok(Value::Number(-args.get_number(vm, 0, ERROR)?))
-        } else {
-            let mut result = args.get_number(vm, 0, ERROR)?;
-            for i in 1..args.num() {
-                result -= args.get_number(vm, i, ERROR)?;
-            }
-
-            Ok(Value::Number(result))
-        }
+        let a = args.get_number(vm, 0, "arguments to `-` must be numbers")?;
+        let b = args.get_number(vm, 1, "arguments to `-` must be numbers")?;
+        Ok(Value::Number(a - b))
     }
 
     pub fn mul(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        let mut result = 1.0;
-        for i in 0..args.num() {
-            result *= args.get_number(vm, i, "arguments to (*) must be numbers")?;
-        }
-
-        Ok(Value::Number(result))
+        let a = args.get_number(vm, 0, "arguments to `*` must be numbers")?;
+        let b = args.get_number(vm, 1, "arguments to `*` must be numbers")?;
+        Ok(Value::Number(a * b))
     }
 
     pub fn div(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() < 1 {
-            return Err(vm.create_exception("(/) requires at least one argument to divide"));
-        }
-
-        static ERROR: &str = "arguments to (/) must be numbers";
-        let mut result = args.get_number(vm, 0, ERROR)?;
-        for i in 1..args.num() {
-            result /= args.get_number(vm, i, ERROR)?;
-        }
-
-        Ok(Value::Number(result))
+        let a = args.get_number(vm, 0, "arguments to `/` must be numbers")?;
+        let b = args.get_number(vm, 1, "arguments to `/` must be numbers")?;
+        Ok(Value::Number(a / b))
     }
 
     pub fn neg(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
@@ -211,83 +186,49 @@ pub mod fns {
     }
 
     pub fn not(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() != 1 {
-            return Err(vm.create_exception("(not) expects a single argument to negate"));
-        }
-
         let value = args.get(vm, 0);
         Ok(Value::from(value.is_falsy()))
     }
 
     pub fn eq(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() != 2 {
-            return Err(vm.create_exception("(=) expects two arguments to compare"));
-        }
-
         let a = args.get(vm, 0);
         let b = args.get(vm, 1);
         Ok(Value::from(a == b))
     }
 
     pub fn neq(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() != 2 {
-            return Err(vm.create_exception("(<>) expects two arguments to compare"));
-        }
-
         let a = args.get(vm, 0);
         let b = args.get(vm, 1);
         Ok(Value::from(a != b))
     }
 
     pub fn lt(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() != 2 {
-            return Err(vm.create_exception("(<) expects two arguments to compare"));
-        }
-
         let a = args.get(vm, 0);
         let b = args.get(vm, 1);
         Ok(Value::from(a < b))
     }
 
     pub fn leq(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() != 2 {
-            return Err(vm.create_exception("(<=) expects two arguments to compare"));
-        }
-
         let a = args.get(vm, 0);
         let b = args.get(vm, 1);
         Ok(Value::from(a <= b))
     }
 
     pub fn gt(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() != 2 {
-            return Err(vm.create_exception("(>) expects two arguments to compare"));
-        }
-
         let a = args.get(vm, 0);
         let b = args.get(vm, 1);
         Ok(Value::from(a > b))
     }
 
     pub fn geq(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        if args.num() != 2 {
-            return Err(vm.create_exception("(>=) expects two arguments to compare"));
-        }
-
         let a = args.get(vm, 0);
         let b = args.get(vm, 1);
         Ok(Value::from(a >= b))
     }
 
     pub fn vec(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        static ERROR: &str = "arguments to (vec) must be numbers (vec x y z w)";
+        static ERROR: &str = "arguments to `vec` must be numbers (vec x y z w)";
         match args.num() {
-            0 => Ok(Value::Vec4(Vec4 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                w: 0.0,
-            })),
             1 => {
                 let x = args.get_number(vm, 0, ERROR)?;
                 Ok(Value::Vec4(Vec4 {
@@ -320,49 +261,49 @@ pub mod fns {
                 let w = args.get_number(vm, 3, ERROR)?;
                 Ok(Value::Vec4(Vec4 { x, y, z, w }))
             }
-            _ => Err(vm.create_exception("(vec) expects 0-4 arguments (vec x y z w)")),
+            _ => Err(vm.create_exception("`vec` expects 1-4 arguments (vec x y z w)")),
         }
     }
 
     pub fn vec_x(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(.x) expects a single argument (.x vec)"));
+            return Err(vm.create_exception("`vecX` expects a single argument (vecX vec)"));
         }
 
-        let vec = args.get_vec4(vm, 0, "argument to (.x vec) must be a (vec)")?;
+        let vec = args.get_vec4(vm, 0, "argument to (vecX vec) must be a `vec`")?;
         Ok(Value::Number(vec.x))
     }
 
     pub fn vec_y(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(.y) expects a single argument (.y vec)"));
+            return Err(vm.create_exception("`vecY` expects a single argument (vecY vec)"));
         }
 
-        let vec = args.get_vec4(vm, 0, "argument to (.y vec) must be a (vec)")?;
+        let vec = args.get_vec4(vm, 0, "argument to (vecY vec) must be a `vec`")?;
         Ok(Value::Number(vec.y))
     }
 
     pub fn vec_z(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(.z) expects a single argument (.z vec)"));
+            return Err(vm.create_exception("`vecZ` expects a single argument (vecZ vec)"));
         }
 
-        let vec = args.get_vec4(vm, 0, "argument to (.z vec) must be a (vec)")?;
+        let vec = args.get_vec4(vm, 0, "argument to (vecZ vec) must be a `vec`")?;
         Ok(Value::Number(vec.z))
     }
 
     pub fn vec_w(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(.w) expects a single argument (.w vec)"));
+            return Err(vm.create_exception("`vecW` expects a single argument (vecW vec)"));
         }
 
-        let vec = args.get_vec4(vm, 0, "argument to (.w vec) must be a (vec)")?;
+        let vec = args.get_vec4(vm, 0, "argument to (vecW vec) must be a `vec`")?;
         Ok(Value::Number(vec.w))
     }
 
     pub fn rgba(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 4 {
-            return Err(vm.create_exception("(rgba) expects four arguments (rgba r g b a)"));
+            return Err(vm.create_exception("`rgba` expects four arguments (rgba r g b a)"));
         }
 
         static ERROR: &str = "arguments to (rgba r g b a) must be numbers";
@@ -376,37 +317,37 @@ pub mod fns {
 
     pub fn rgba_r(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(.r) expects a single argument (.r rgba)"));
+            return Err(vm.create_exception("`rgbaR` expects a single argument (rgbaR rgba)"));
         }
 
-        let rgba = args.get_rgba(vm, 0, "argument to (.r rgba) must be an (rgba)")?;
+        let rgba = args.get_rgba(vm, 0, "argument to (rgbaR rgba) must be an `rgba`")?;
         Ok(Value::Number(rgba.r))
     }
 
     pub fn rgba_g(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(.g) expects a single argument (.g rgba)"));
+            return Err(vm.create_exception("`rgbaG` expects a single argument (rgbaG rgba)"));
         }
 
-        let rgba = args.get_rgba(vm, 0, "argument to (.g rgba) must be an (rgba)")?;
-        Ok(Value::Number(rgba.g))
+        let rgba = args.get_rgba(vm, 0, "argument to (rgbaG rgba) must be an `rgba`")?;
+        Ok(Value::Number(rgba.r))
     }
 
     pub fn rgba_b(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(.b) expects a single argument (.b rgba)"));
+            return Err(vm.create_exception("`rgbaB` expects a single argument (rgbaB rgba)"));
         }
 
-        let rgba = args.get_rgba(vm, 0, "argument to (.b rgba) must be an (rgba)")?;
+        let rgba = args.get_rgba(vm, 0, "argument to (rgbaB rgba) must be an `rgba`")?;
         Ok(Value::Number(rgba.r))
     }
 
     pub fn rgba_a(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(.a) expects a single argument (.a rgba)"));
+            return Err(vm.create_exception("`rgbaA` expects a single argument (rgbaA rgba)"));
         }
 
-        let rgba = args.get_rgba(vm, 0, "argument to (.a rgba) must be an (rgba)")?;
+        let rgba = args.get_rgba(vm, 0, "argument to (rgbaA rgba) must be an `rgba`")?;
         Ok(Value::Number(rgba.r))
     }
 
@@ -433,7 +374,7 @@ pub mod fns {
 
     pub fn to_shape_f(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 1 {
-            return Err(vm.create_exception("(shape) expects 1 argument (shape value)"));
+            return Err(vm.create_exception("`toShape` expects 1 argument (toShape value)"));
         }
 
         if let Some(shape) = to_shape(args.get(vm, 0), vm) {
@@ -446,10 +387,10 @@ pub mod fns {
 
     pub fn line(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 2 {
-            return Err(vm.create_exception("(line) expects 2 arguments (line start end)"));
+            return Err(vm.create_exception("`line` expects 2 arguments (line start end)"));
         }
 
-        static ERROR: &str = "arguments to (line) must be (vec)";
+        static ERROR: &str = "arguments to `line` must be `vec`";
         let start = args.get_vec4(vm, 0, ERROR)?;
         let end = args.get_vec4(vm, 1, ERROR)?;
 
@@ -458,8 +399,8 @@ pub mod fns {
     }
 
     pub fn rect(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        static ARGS2: &str = "arguments to 2-argument (rect) must be (vec)";
-        static ARGS4: &str = "arguments to 4-argument (rect) must be numbers";
+        static ARGS2: &str = "arguments to 2-argument `rect` must be `vec`";
+        static ARGS4: &str = "arguments to 4-argument `rect` must be numbers";
 
         let (position, size) = match args.num() {
             2 => (args.get_vec4(vm, 0, ARGS2)?.into(), args.get_vec4(vm, 1, ARGS2)?.into()),
@@ -473,7 +414,7 @@ pub mod fns {
                     y: args.get_number(vm, 3, ARGS4)?,
                 },
             ),
-            _ => return Err(vm.create_exception("(rect) expects 2 arguments (rect position size) or 4 arguments (rect x y width height)"))
+            _ => return Err(vm.create_exception("`rect` expects 2 arguments (rect position size) or 4 arguments (rect x y width height)"))
         };
 
         let id = vm.create_ref(Ref::Shape(Shape::Rect(position, size)))?;
@@ -481,8 +422,8 @@ pub mod fns {
     }
 
     pub fn circle(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
-        static ARGS2: &str = "arguments to 2-argument (circle) must be (vec) and a number";
-        static ARGS3: &str = "arguments to 3-argument (circle) must be numbers";
+        static ARGS2: &str = "arguments to 2-argument `circle` must be `vec` and a number";
+        static ARGS3: &str = "arguments to 3-argument `circle` must be numbers";
 
         let (position, radius) = match args.num() {
             2 => (args.get_vec4(vm, 0, ARGS2)?.into(), args.get_number(vm, 1, ARGS2)?),
@@ -493,7 +434,7 @@ pub mod fns {
                 },
                 args.get_number(vm, 2, ARGS3)?
             ),
-            _ => return Err(vm.create_exception("(circle) expects 2 arguments (circle position radius) or 3 arguments (circle x y radius)"))
+            _ => return Err(vm.create_exception("`circle` expects 2 arguments (circle position radius) or 3 arguments (circle x y radius)"))
         };
 
         let id = vm.create_ref(Ref::Shape(Shape::Circle(position, radius)))?;
@@ -503,16 +444,16 @@ pub mod fns {
     pub fn stroke(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 3 {
             return Err(
-                vm.create_exception("(stroke) expects 3 arguments (stroke thickness color shape)")
+                vm.create_exception("`stroke` expects 3 arguments (stroke thickness color shape)")
             );
         }
 
         let thickness = args.get_number(
             vm,
             0,
-            "1st argument to (stroke) must be a thickness in pixels (number)",
+            "1st argument to `stroke` must be a thickness in pixels (number)",
         )?;
-        let color = args.get_rgba(vm, 1, "2nd argument to (stroke) must be a color (rgba)")?;
+        let color = args.get_rgba(vm, 1, "2nd argument to `stroke` must be a color (rgba)")?;
         if let Some(shape) = to_shape(args.get(vm, 2), vm) {
             let id = vm.create_ref(Ref::Scribble(Scribble::Stroke(Stroke {
                 thickness,
@@ -527,10 +468,10 @@ pub mod fns {
 
     pub fn fill(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         if args.num() != 2 {
-            return Err(vm.create_exception("(fill) expects 2 arguments (fill color shape)"));
+            return Err(vm.create_exception("`fill` expects 2 arguments (fill color shape)"));
         }
 
-        let color = args.get_rgba(vm, 0, "1st argument to (fill) must be a color (rgba)")?;
+        let color = args.get_rgba(vm, 0, "1st argument to `fill` must be a color (rgba)")?;
         if let Some(shape) = to_shape(args.get(vm, 1), vm) {
             let id = vm.create_ref(Ref::Scribble(Scribble::Fill(Fill { color, shape })))?;
             Ok(Value::Ref(id))

@@ -114,6 +114,7 @@ rkgk-reticle-cursor {
             position: absolute;
             top: 20px;
             left: 8px;
+            width: max-content;
 
             color: white;
             background-color: var(--color);

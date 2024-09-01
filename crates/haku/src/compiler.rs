@@ -35,9 +35,9 @@ struct Scope<'a> {
     captures: Vec<Variable>,
 }
 
-pub struct Compiler<'a, 'b> {
+pub struct Compiler<'a> {
     pub defs: &'a mut Defs,
-    pub chunk: &'b mut Chunk,
+    pub chunk: &'a mut Chunk,
     pub diagnostics: Vec<Diagnostic>,
     scopes: Vec<Scope<'a>>,
 }
@@ -47,8 +47,8 @@ pub struct ClosureSpec {
     pub(crate) local_count: u8,
 }
 
-impl<'a, 'b> Compiler<'a, 'b> {
-    pub fn new(defs: &'a mut Defs, chunk: &'b mut Chunk) -> Self {
+impl<'a> Compiler<'a> {
+    pub fn new(defs: &'a mut Defs, chunk: &'a mut Chunk) -> Self {
         Self {
             defs,
             chunk,
@@ -82,11 +82,7 @@ impl<'a, 'b> Compiler<'a, 'b> {
 
 type CompileResult<T = ()> = Result<T, CompileError>;
 
-pub fn compile_expr<'a>(
-    c: &mut Compiler<'a, '_>,
-    src: &Source<'a>,
-    node_id: NodeId,
-) -> CompileResult {
+pub fn compile_expr<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     match src.ast.kind(node_id) {
         // The nil node is special, as it inhabits node ID 0.
         NodeKind::Nil => {
@@ -141,7 +137,7 @@ fn compile_nil(c: &mut Compiler) -> CompileResult {
 struct CaptureError;
 
 fn find_variable(
-    c: &mut Compiler<'_, '_>,
+    c: &mut Compiler,
     name: &str,
     scope_index: usize,
 ) -> Result<Option<Variable>, CaptureError> {
@@ -172,7 +168,7 @@ fn find_variable(
     }
 }
 
-fn compile_ident<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+fn compile_ident<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let span = src.ast.span(node_id);
     let name = span.slice(src.code);
 
@@ -204,7 +200,7 @@ fn compile_ident<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId
     Ok(())
 }
 
-fn compile_number(c: &mut Compiler<'_, '_>, src: &Source<'_>, node_id: NodeId) -> CompileResult {
+fn compile_number(c: &mut Compiler, src: &Source, node_id: NodeId) -> CompileResult {
     let literal = src.ast.span(node_id).slice(src.code);
     let float: f32 = literal
         .parse()
@@ -216,7 +212,7 @@ fn compile_number(c: &mut Compiler<'_, '_>, src: &Source<'_>, node_id: NodeId) -
     Ok(())
 }
 
-fn compile_tag(c: &mut Compiler<'_, '_>, src: &Source, node_id: NodeId) -> CompileResult {
+fn compile_tag(c: &mut Compiler, src: &Source, node_id: NodeId) -> CompileResult {
     let tag = src.ast.span(node_id).slice(src.code);
 
     match tag {
@@ -234,7 +230,7 @@ fn compile_tag(c: &mut Compiler<'_, '_>, src: &Source, node_id: NodeId) -> Compi
     Ok(())
 }
 
-fn compile_unary<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+fn compile_unary<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let mut walk = src.ast.walk(node_id);
     let Some(op) = walk.node() else { return Ok(()) };
     let Some(expr) = walk.node() else {
@@ -262,11 +258,7 @@ fn compile_unary<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId
     Ok(())
 }
 
-fn compile_binary<'a>(
-    c: &mut Compiler<'a, '_>,
-    src: &Source<'a>,
-    node_id: NodeId,
-) -> CompileResult {
+fn compile_binary<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let mut walk = src.ast.walk(node_id);
     let Some(left) = walk.node() else {
         return Ok(());
@@ -306,7 +298,7 @@ fn compile_binary<'a>(
     Ok(())
 }
 
-fn compile_call<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+fn compile_call<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let mut walk = src.ast.walk(node_id);
     let Some(func) = walk.node() else {
         return Ok(());
@@ -347,7 +339,7 @@ fn compile_call<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId)
     Ok(())
 }
 
-fn compile_paren<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+fn compile_paren<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let Some(inner) = src.ast.walk(node_id).node() else {
         return Ok(());
     };
@@ -357,7 +349,7 @@ fn compile_paren<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId
     Ok(())
 }
 
-fn compile_if<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+fn compile_if<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let mut walk = src.ast.walk(node_id);
 
     let Some(condition) = walk.node() else {
@@ -391,7 +383,7 @@ fn compile_if<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -
     Ok(())
 }
 
-fn compile_let<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+fn compile_let<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let mut walk = src.ast.walk(node_id);
 
     let Some(ident) = walk.node() else {
@@ -429,11 +421,7 @@ fn compile_let<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) 
     Ok(())
 }
 
-fn compile_lambda<'a>(
-    c: &mut Compiler<'a, '_>,
-    src: &Source<'a>,
-    node_id: NodeId,
-) -> CompileResult {
+fn compile_lambda<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let mut walk = src.ast.walk(node_id);
     let Some(params) = walk.node() else {
         return Ok(());
@@ -507,11 +495,7 @@ fn compile_lambda<'a>(
     Ok(())
 }
 
-fn compile_toplevel<'a>(
-    c: &mut Compiler<'a, '_>,
-    src: &Source<'a>,
-    node_id: NodeId,
-) -> CompileResult {
+fn compile_toplevel<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     def_prepass(c, src, node_id)?;
 
     let mut walk = src.ast.walk(node_id);
@@ -540,7 +524,7 @@ fn compile_toplevel<'a>(
     Ok(())
 }
 
-fn def_prepass<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, toplevel: NodeId) -> CompileResult {
+fn def_prepass<'a>(c: &mut Compiler<'a>, src: &Source<'a>, toplevel: NodeId) -> CompileResult {
     let mut walk = src.ast.walk(toplevel);
 
     // This is a bit of a pattern matching tapeworm, but Rust unfortunately doesn't have `if let`
@@ -574,7 +558,7 @@ enum ToplevelExpr {
 }
 
 fn compile_toplevel_expr<'a>(
-    c: &mut Compiler<'a, '_>,
+    c: &mut Compiler<'a>,
     src: &Source<'a>,
     node_id: NodeId,
 ) -> CompileResult<ToplevelExpr> {
@@ -591,7 +575,7 @@ fn compile_toplevel_expr<'a>(
     Ok(ToplevelExpr::Result)
 }
 
-fn compile_def<'a>(c: &mut Compiler<'a, '_>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+fn compile_def<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
     let mut walk = src.ast.walk(node_id);
     let Some(left) = walk.node() else {
         return Ok(());

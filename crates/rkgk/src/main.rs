@@ -15,7 +15,7 @@ use handlebars::Handlebars;
 use serde::Serialize;
 use tokio::{fs, net::TcpListener};
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{info, info_span, instrument};
+use tracing::{info, instrument};
 use walkdir::WalkDir;
 
 mod api;

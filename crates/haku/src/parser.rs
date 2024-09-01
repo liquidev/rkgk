@@ -1,4 +1,4 @@
-use core::cell::Cell;
+use core::{cell::Cell, error::Error, fmt};
 
 use alloc::vec::Vec;
 
@@ -22,8 +22,15 @@ pub struct Parser<'a> {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+struct Event {
+    kind: EventKind,
+
+    #[cfg(debug_assertions)]
+    from: &'static core::panic::Location<'static>,
+}
+
 #[derive(Debug)]
-enum Event {
+enum EventKind {
     Open { kind: NodeKind },
     Close,
     Advance,
@@ -52,32 +59,35 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn event(&mut self, event: Event) -> Option<usize> {
+    #[track_caller]
+    fn event(&mut self, event: EventKind) -> Option<usize> {
         if self.events.len() < self.events.capacity() {
             let index = self.events.len();
-            self.events.push(event);
+            self.events.push(Event::new(event));
             Some(index)
         } else {
             None
         }
     }
 
+    #[track_caller]
     fn open(&mut self) -> Open {
         Open {
-            index: self.event(Event::Open {
+            index: self.event(EventKind::Open {
                 kind: NodeKind::Error,
             }),
         }
     }
 
+    #[track_caller]
     fn open_before(&mut self, closed: Closed) -> Open {
         if let Some(index) = closed.index {
             if self.events.len() < self.events.capacity() {
                 self.events.insert(
                     index,
-                    Event::Open {
+                    Event::new(EventKind::Open {
                         kind: NodeKind::Error,
-                    },
+                    }),
                 );
                 return Open { index: Some(index) };
             }
@@ -85,10 +95,11 @@ impl<'a> Parser<'a> {
         Open { index: None }
     }
 
+    #[track_caller]
     fn close(&mut self, open: Open, kind: NodeKind) -> Closed {
         if let Some(index) = open.index {
-            self.events[index] = Event::Open { kind };
-            self.event(Event::Close);
+            self.events[index].kind = EventKind::Open { kind };
+            self.event(EventKind::Close);
             Closed { index: Some(index) }
         } else {
             Closed { index: None }
@@ -102,7 +113,7 @@ impl<'a> Parser<'a> {
     fn advance(&mut self) {
         if !self.is_eof() {
             self.position += 1;
-            self.event(Event::Advance);
+            self.event(EventKind::Advance);
             self.fuel.set(Self::FUEL);
         }
     }
@@ -125,6 +136,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[track_caller]
     fn advance_with_error(&mut self) -> Closed {
         let opened = self.open();
         self.advance();
@@ -140,7 +152,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn into_ast(self, ast: &mut Ast) -> Result<(NodeId, Vec<Diagnostic>), NodeAllocError> {
+    pub fn into_ast(self, ast: &mut Ast) -> Result<(NodeId, Vec<Diagnostic>), IntoAstError> {
         let mut token = 0;
         let mut events = self.events;
         let mut stack = Vec::new();
@@ -152,24 +164,30 @@ impl<'a> Parser<'a> {
         }
 
         // Remove the last Close to keep a single node on the stack.
-        assert!(matches!(events.pop(), Some(Event::Close)));
+        assert!(matches!(
+            events.pop(),
+            Some(Event {
+                kind: EventKind::Close,
+                ..
+            })
+        ));
 
         for event in events {
-            match event {
-                Event::Open { kind } => {
+            match event.kind {
+                EventKind::Open { kind } => {
                     stack.push(StackEntry {
                         node_id: ast.alloc(kind, self.tokens.span(token))?,
                         children: Vec::new(),
                     });
                 }
-                Event::Close => {
+                EventKind::Close => {
                     let end_span = self.tokens.span(token.saturating_sub(1));
                     let stack_entry = stack.pop().unwrap();
                     ast.alloc_children(stack_entry.node_id, &stack_entry.children);
                     ast.extend_span(stack_entry.node_id, end_span.end);
                     stack.last_mut().unwrap().children.push(stack_entry.node_id);
                 }
-                Event::Advance => {
+                EventKind::Advance => {
                     let span = self.tokens.span(token);
                     let node_id = ast.alloc(NodeKind::Token, span)?;
                     stack
@@ -184,7 +202,7 @@ impl<'a> Parser<'a> {
 
         if stack.len() != 1 {
             // This means we had too many events emitted and they are no longer balanced.
-            return Err(NodeAllocError);
+            return Err(IntoAstError::UnbalancedEvents);
         }
         // assert_eq!(token, self.tokens.len());
 
@@ -197,13 +215,59 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl<'a> core::fmt::Debug for Parser<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl<'a> fmt::Debug for Parser<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Parser")
             .field("events", &self.events)
             .finish_non_exhaustive()
     }
 }
+
+impl Event {
+    #[track_caller]
+    fn new(kind: EventKind) -> Event {
+        Event {
+            kind,
+            from: core::panic::Location::caller(),
+        }
+    }
+}
+
+impl fmt::Debug for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:?} @ {}:{}:{}",
+            self.kind,
+            self.from.file(),
+            self.from.line(),
+            self.from.column()
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntoAstError {
+    NodeAlloc(NodeAllocError),
+    UnbalancedEvents,
+}
+
+impl From<NodeAllocError> for IntoAstError {
+    fn from(value: NodeAllocError) -> Self {
+        Self::NodeAlloc(value)
+    }
+}
+
+impl fmt::Display for IntoAstError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IntoAstError::NodeAlloc(e) => fmt::Display::fmt(e, f),
+            IntoAstError::UnbalancedEvents => f.write_str("parser produced unbalanced events"),
+        }
+    }
+}
+
+impl Error for IntoAstError {}
 
 enum Tighter {
     Left,
@@ -337,11 +401,11 @@ fn paren(p: &mut Parser) -> Closed {
         p.optional_newline();
         if p.peek() != TokenKind::RParen {
             p.emit(Diagnostic::error(lspan, "missing closing parenthesis `)`"));
-            p.advance_with_error()
+            p.advance_with_error();
         } else {
             p.advance();
-            p.close(o, NodeKind::Paren)
         }
+        p.close(o, NodeKind::Paren)
     }
 }
 

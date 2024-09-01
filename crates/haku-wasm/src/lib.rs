@@ -2,16 +2,16 @@
 
 extern crate alloc;
 
-use core::{alloc::Layout, num::Saturating, slice};
+use core::{alloc::Layout, slice};
 
 use alloc::{boxed::Box, vec::Vec};
 use haku::{
     ast::Ast,
     bytecode::{Chunk, Defs, DefsImage},
-    compiler::{compile_expr, CompileError, Compiler, Source},
+    compiler::{compile_expr, ClosureSpec, CompileError, Compiler, Source},
     diagnostic::Diagnostic,
     lexer::{lex, Lexer},
-    parser::{self, Parser},
+    parser::{self, IntoAstError, Parser},
     render::{
         tiny_skia::{Pixmap, PremultipliedColorU8},
         Renderer, RendererLimits,
@@ -19,7 +19,7 @@ use haku::{
     source::SourceCode,
     system::{ChunkId, System, SystemImage},
     token::Lexis,
-    value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
+    value::{Closure, Ref, Value},
     vm::{Exception, Vm, VmImage, VmLimits},
 };
 use log::{debug, info};
@@ -220,6 +220,7 @@ enum StatusCode {
     SourceCodeTooLong,
     TooManyTokens,
     TooManyAstNodes,
+    ParserUnbalancedEvents,
     ChunkTooBig,
     DiagnosticsEmitted,
     TooManyChunks,
@@ -253,6 +254,7 @@ extern "C" fn haku_status_string(code: StatusCode) -> *const i8 {
         StatusCode::SourceCodeTooLong => c"source code is too long",
         StatusCode::TooManyTokens => c"source code has too many tokens",
         StatusCode::TooManyAstNodes => c"source code has too many AST nodes",
+        StatusCode::ParserUnbalancedEvents => c"parser produced unbalanced events",
         StatusCode::ChunkTooBig => c"compiled bytecode is too large",
         StatusCode::DiagnosticsEmitted => c"diagnostics were emitted",
         StatusCode::TooManyChunks => c"too many registered bytecode chunks",
@@ -267,7 +269,7 @@ extern "C" fn haku_status_string(code: StatusCode) -> *const i8 {
 enum BrushState {
     #[default]
     Default,
-    Ready(ChunkId),
+    Ready(ChunkId, ClosureSpec),
 }
 
 #[derive(Debug, Default)]
@@ -348,8 +350,10 @@ unsafe extern "C" fn haku_compile_brush(
         },
     );
     parser::toplevel(&mut parser);
-    let Ok((root, mut parser_diagnostics)) = parser.into_ast(&mut ast) else {
-        return StatusCode::TooManyAstNodes;
+    let (root, mut parser_diagnostics) = match parser.into_ast(&mut ast) {
+        Ok((r, d)) => (r, d),
+        Err(IntoAstError::NodeAlloc(_)) => return StatusCode::TooManyAstNodes,
+        Err(IntoAstError::UnbalancedEvents) => return StatusCode::ParserUnbalancedEvents,
     };
 
     let src = Source {
@@ -365,6 +369,7 @@ unsafe extern "C" fn haku_compile_brush(
             CompileError::Emit => return StatusCode::ChunkTooBig,
         }
     }
+    let closure_spec = compiler.closure_spec();
 
     let mut diagnostics = lexer.diagnostics;
     diagnostics.append(&mut parser_diagnostics);
@@ -378,7 +383,7 @@ unsafe extern "C" fn haku_compile_brush(
         Ok(chunk_id) => chunk_id,
         Err(_) => return StatusCode::TooManyChunks,
     };
-    brush.state = BrushState::Ready(chunk_id);
+    brush.state = BrushState::Ready(chunk_id, closure_spec);
 
     info!("brush compiled into {chunk_id:?}");
 
@@ -421,22 +426,17 @@ unsafe extern "C" fn haku_eval_brush(instance: *mut Instance, brush: *const Brus
     let instance = &mut *instance;
     let brush = &*brush;
 
-    let BrushState::Ready(chunk_id) = brush.state else {
+    let BrushState::Ready(chunk_id, closure_spec) = brush.state else {
         panic!("brush is not compiled and ready to be used");
     };
 
     debug!("applying defs");
     instance.vm.apply_defs(&instance.defs);
 
-    let Ok(closure_id) = instance.vm.create_ref(Ref::Closure(Closure {
-        start: BytecodeLoc {
-            chunk_id,
-            offset: 0,
-        },
-        name: FunctionName::Anonymous,
-        param_count: 0,
-        captures: Vec::new(),
-    })) else {
+    let Ok(closure_id) = instance
+        .vm
+        .create_ref(Ref::Closure(Closure::chunk(chunk_id, closure_spec)))
+    else {
         return StatusCode::OutOfRefSlots;
     };
 

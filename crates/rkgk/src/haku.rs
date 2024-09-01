@@ -7,14 +7,14 @@ use eyre::{bail, Context, OptionExt};
 use haku::{
     ast::Ast,
     bytecode::{Chunk, Defs, DefsImage},
-    compiler::{Compiler, Source},
+    compiler::{ClosureSpec, Compiler, Source},
     lexer::{lex, Lexer},
     parser::{self, Parser, ParserLimits},
     render::{tiny_skia::Pixmap, Renderer, RendererLimits},
     source::SourceCode,
     system::{ChunkId, System, SystemImage},
     token::Lexis,
-    value::{BytecodeLoc, Closure, FunctionName, Ref, Value},
+    value::{Closure, Ref, Value},
     vm::{Vm, VmImage, VmLimits},
 };
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ pub struct Haku {
     vm: Vm,
     vm_image: VmImage,
 
-    brush: Option<ChunkId>,
+    brush: Option<(ChunkId, ClosureSpec)>,
 }
 
 impl Haku {
@@ -121,6 +121,7 @@ impl Haku {
         let mut compiler = Compiler::new(&mut self.defs, &mut chunk);
         haku::compiler::compile_expr(&mut compiler, &src, root)
             .context("failed to compile the chunk")?;
+        let closure_spec = compiler.closure_spec();
 
         if !lexer.diagnostics.is_empty()
             || !parser_diagnostics.is_empty()
@@ -130,13 +131,13 @@ impl Haku {
         }
 
         let chunk_id = self.system.add_chunk(chunk).context("too many chunks")?;
-        self.brush = Some(chunk_id);
+        self.brush = Some((chunk_id, closure_spec));
 
         Ok(())
     }
 
     pub fn eval_brush(&mut self) -> eyre::Result<Value> {
-        let brush = self
+        let (chunk_id, closure_spec) = self
             .brush
             .ok_or_eyre("brush is not compiled and ready to be used")?;
 
@@ -144,15 +145,7 @@ impl Haku {
 
         let closure_id = self
             .vm
-            .create_ref(Ref::Closure(Closure {
-                start: BytecodeLoc {
-                    chunk_id: brush,
-                    offset: 0,
-                },
-                name: FunctionName::Anonymous,
-                param_count: 0,
-                captures: vec![],
-            }))
+            .create_ref(Ref::Closure(Closure::chunk(chunk_id, closure_spec)))
             .context("not enough ref slots to create initial closure")?;
 
         let scribble = self

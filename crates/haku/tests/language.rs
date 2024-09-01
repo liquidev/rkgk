@@ -9,7 +9,7 @@ use haku::{
     source::SourceCode,
     system::System,
     token::Lexis,
-    value::{BytecodeLoc, Closure, FunctionName, Ref, RefId, Value},
+    value::{Closure, Ref, RefId, Value},
     vm::{Vm, VmLimits},
 };
 

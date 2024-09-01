@@ -18,7 +18,10 @@ fn parse(s: &str, f: fn(&mut Parser)) -> (Ast, NodeId) {
     f(&mut parser);
 
     if !parser.diagnostics.is_empty() {
-        panic!("parser emitted diagnostics: {:#?}", parser.diagnostics);
+        panic!(
+            "parser: {parser:#?}\nemitted diagnostics: {:#?}",
+            parser.diagnostics
+        );
     }
 
     let mut ast = Ast::new(1024);

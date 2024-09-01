@@ -5,11 +5,12 @@ use core::{
 };
 
 use alloc::{string::String, vec::Vec};
+use log::info;
 
 use crate::{
     bytecode::{self, Defs, Opcode, CAPTURE_CAPTURE, CAPTURE_LOCAL},
     system::{ChunkId, System},
-    value::{BytecodeLoc, Closure, FunctionName, Ref, RefId, Rgba, Value, Vec4},
+    value::{BytecodeLoc, Closure, FunctionName, List, Ref, RefId, Rgba, Value, Vec4},
 };
 
 pub struct VmLimits {
@@ -208,6 +209,19 @@ impl Vm {
                     self.push(Value::Number(x))?;
                 }
 
+                Opcode::Rgba => {
+                    let r = chunk.read_u8(&mut pc)?;
+                    let g = chunk.read_u8(&mut pc)?;
+                    let b = chunk.read_u8(&mut pc)?;
+                    let a = chunk.read_u8(&mut pc)?;
+                    self.push(Value::Rgba(Rgba {
+                        r: r as f32 / 255.0,
+                        g: g as f32 / 255.0,
+                        b: b as f32 / 255.0,
+                        a: a as f32 / 255.0,
+                    }))?;
+                }
+
                 Opcode::Local => {
                     let index = chunk.read_u8(&mut pc)? as usize;
                     let value = self.get(bottom + index)?;
@@ -244,6 +258,20 @@ impl Vm {
                         return Err(self
                             .create_exception("corrupted bytecode (set def index out of bounds)"));
                     }
+                }
+
+                Opcode::List => {
+                    let len = chunk.read_u16(&mut pc)? as usize;
+                    let bottom = self.stack.len().checked_sub(len).ok_or_else(|| {
+                        self.create_exception(
+                            "corrupted bytecode (list has more elements than stack)",
+                        )
+                    })?;
+                    let elements = self.stack[bottom..].to_vec();
+                    self.stack.resize_with(bottom, || unreachable!());
+                    self.track_array(&elements)?;
+                    let id = self.create_ref(Ref::List(List { elements }))?;
+                    self.push(Value::Ref(id))?;
                 }
 
                 Opcode::Function => {

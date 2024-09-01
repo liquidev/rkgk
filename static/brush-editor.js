@@ -3,7 +3,7 @@ const defaultBrush = `
 -- Try playing around with the numbers,
 -- and see what happens!
 
-stroke 8 (rgba 0 0 0 1) (vec 0 0)
+stroke 8 #000 (vec 0 0)
 `.trim();
 
 export class BrushEditor extends HTMLElement {

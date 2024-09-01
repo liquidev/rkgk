@@ -4,6 +4,7 @@ use core::{
 };
 
 use alloc::vec::Vec;
+use log::info;
 
 use crate::{
     ast::{Ast, NodeId, NodeKind},
@@ -98,12 +99,11 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId)
         // as they may also contain commas and other trivia.
         NodeKind::Param => unreachable!("Param node should never be emitted"),
 
-        NodeKind::Color => unsupported(c, src, node_id, "color literals are not implemented yet"),
-
         NodeKind::Ident => compile_ident(c, src, node_id),
-        NodeKind::Number => compile_number(c, src, node_id),
         NodeKind::Tag => compile_tag(c, src, node_id),
-        NodeKind::List => unsupported(c, src, node_id, "list literals are not implemented yet"),
+        NodeKind::Number => compile_number(c, src, node_id),
+        NodeKind::Color => compile_color(c, src, node_id),
+        NodeKind::List => compile_list(c, src, node_id),
 
         NodeKind::Unary => compile_unary(c, src, node_id),
         NodeKind::Binary => compile_binary(c, src, node_id),
@@ -200,18 +200,6 @@ fn compile_ident<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) ->
     Ok(())
 }
 
-fn compile_number(c: &mut Compiler, src: &Source, node_id: NodeId) -> CompileResult {
-    let literal = src.ast.span(node_id).slice(src.code);
-    let float: f32 = literal
-        .parse()
-        .expect("the parser should've gotten us a string parsable by the stdlib");
-
-    c.chunk.emit_opcode(Opcode::Number)?;
-    c.chunk.emit_f32(float)?;
-
-    Ok(())
-}
-
 fn compile_tag(c: &mut Compiler, src: &Source, node_id: NodeId) -> CompileResult {
     let tag = src.ast.span(node_id).slice(src.code);
 
@@ -226,6 +214,79 @@ fn compile_tag(c: &mut Compiler, src: &Source, node_id: NodeId) -> CompileResult
             c.emit(Diagnostic::error(src.ast.span(node_id), "uppercased identifiers are reserved for future use; please start your identifiers with a lowercase letter instead"));
         }
     }
+
+    Ok(())
+}
+
+fn compile_number(c: &mut Compiler, src: &Source, node_id: NodeId) -> CompileResult {
+    let literal = src.ast.span(node_id).slice(src.code);
+    if let Ok(float) = literal.parse() {
+        c.chunk.emit_opcode(Opcode::Number)?;
+        c.chunk.emit_f32(float)?;
+    }
+
+    Ok(())
+}
+
+fn compile_color(c: &mut Compiler, src: &Source, node_id: NodeId) -> CompileResult {
+    let literal = src.ast.span(node_id).slice(src.code);
+
+    let hex = &literal[1..];
+    let bytes: [u8; 4] = u32::from_str_radix(hex, 16)
+        .ok()
+        .and_then(|num| match hex.len() {
+            3 => Some([
+                (((num & 0xF00) >> 8) * 0x11) as u8,
+                (((num & 0x0F0) >> 4) * 0x11) as u8,
+                ((num & 0x00F) * 0x11) as u8,
+                0xFF,
+            ]),
+            4 => Some([
+                (((num & 0xF000) >> 12) * 0x11) as u8,
+                (((num & 0x0F00) >> 8) * 0x11) as u8,
+                (((num & 0x00F0) >> 4) * 0x11) as u8,
+                ((num & 0x000F) * 0x11) as u8,
+            ]),
+            6 => Some([
+                ((num & 0xFF0000) >> 16) as u8,
+                ((num & 0x00FF00) >> 8) as u8,
+                (num & 0x0000FF) as u8,
+                0xFF,
+            ]),
+            8 => Some([
+                ((num & 0xFF000000) >> 24) as u8,
+                ((num & 0x00FF0000) >> 16) as u8,
+                ((num & 0x0000FF00) >> 8) as u8,
+                (num & 0x000000FF) as u8,
+            ]),
+            _ => None,
+        })
+        .unwrap_or([0, 0, 0, 0]);
+
+    c.chunk.emit_opcode(Opcode::Rgba)?;
+    c.chunk.emit_bytes(&bytes)?;
+
+    Ok(())
+}
+
+fn compile_list<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> CompileResult {
+    let mut walk = src.ast.walk(node_id);
+
+    let mut len = 0;
+    while let Some(expr) = walk.node() {
+        compile_expr(c, src, expr)?;
+        len += 1;
+    }
+
+    let len = u16::try_from(len).unwrap_or_else(|_| {
+        // For all practical intents and purposes, this should never happen---you'll most likely
+        // run into the chunk length limit first.
+        c.emit(Diagnostic::error(src.ast.span(node_id), "list is too long"));
+        0
+    });
+
+    c.chunk.emit_opcode(Opcode::List)?;
+    c.chunk.emit_u16(len)?;
 
     Ok(())
 }

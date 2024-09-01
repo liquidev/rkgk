@@ -17,16 +17,16 @@ impl<'a> Lexer<'a> {
     pub fn new(lexis: Lexis, input: &'a SourceCode) -> Self {
         Self {
             lexis,
-            diagnostics: Vec::new(),
+            diagnostics: Vec::with_capacity(16),
             input,
             position: 0,
         }
     }
 
     fn current(&self) -> char {
-        self.input[self.position as usize..]
-            .chars()
-            .next()
+        self.input
+            .get(self.position as usize..)
+            .and_then(|s| s.chars().next())
             .unwrap_or('\0')
     }
 
@@ -140,7 +140,7 @@ fn whitespace_and_comments(l: &mut Lexer<'_>) {
                 let position = l.position;
                 l.advance();
                 if l.current() == '-' {
-                    while l.current() != '\n' {
+                    while l.current() != '\n' && l.current() != '\0' {
                         l.advance();
                     }
                 } else {

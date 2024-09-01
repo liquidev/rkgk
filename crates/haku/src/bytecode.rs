@@ -13,6 +13,7 @@ pub enum Opcode {
     False,
     True,
     Number, // (float: f32)
+    Rgba,   // (r: u8, g: u8, b: u8, a: u8)
 
     // Duplicate existing values.
     /// Push a value relative to the bottom of the current stack window.
@@ -25,6 +26,9 @@ pub enum Opcode {
     Def, // (index: u16)
     /// Set the value of a definition.
     SetDef, // (index: u16)
+
+    // Create lists.
+    List, // (len: u16)
 
     // Create literal functions.
     Function, // (params: u8, then: u16), at `then`: (local_count: u8, capture_count: u8, captures: [(source: u8, index: u8); capture_count])

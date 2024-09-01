@@ -27,7 +27,7 @@ In case you edited anything in the input box on the right, paste the following t
 -- Try playing around with the numbers,
 -- and see what happens!
 
-stroke 8 (rgba 0 0 0 1) (vec 0 0)
+stroke 8 #000 (vec 0 0)
 ```
 
 rakugaki is a drawing program for digital scribbles and other pieces of art.
@@ -78,35 +78,51 @@ Theoretically, this would mean brushes are very limited.
 After all, if we're only limited to drawing single scribbles, wouldn't that mean a brush can only draw a single shape?
 
 But the magical part is that you can _compose scribbles together._
-If you want to draw multiple scribbles, you can wrap them into a `list`:
+If you want to draw multiple scribbles, you can wrap them into a list, which we denote with square brackets `[]`:
 
 ```haku
-; Draw two colorful dots instead of one!
-(list
-  (stroke 8 (rgba 1.0 0.0 0.0 1.0) (vec 4 0))
-  (stroke 8 (rgba 0.0 0.0 1.0 1.0) (vec (- 4) 0)))
+-- Draw two colorful dots instead of one!
+[
+  stroke 8 #F00 (vec 4 0)
+  stroke 8 #00F (vec (-4) 0))
+]
 ```
 
 ::: aside
 
-This is kind of weird, but to negate a number in haku, you have to write `(- number)`, with all the parentheses and spaces in place.
+haku uses the syntax `-- OwO` for _comments_---human-readable pieces of text that are ignored by the compiler.
+A comment begins with `--`, and ends at the end of a line.
 
-You'll understand why later!
+They're pretty useful for making your code more understandable!
+After all, we don't speak programming languages natively.
 
 :::
 
-And what's even crazier is that you can composes lists _further_---you can make a list of lists, and rakugaki will be happy with that!
+And what's even crazier is that you can compose lists _further_---you can make a list of lists, and rakugaki will be happy with that!
 It'll draw the first inner list, which contains two scribbles, and then it'll draw the second inner list, which contains two scribbles.
 
 ```haku
-(list
-  (list
-    (stroke 8 (rgba 1.0 0.0 0.0 1.0) (vec 4 (- 4)))
-    (stroke 8 (rgba 0.0 0.0 1.0 1.0) (vec (- 4) (- 4))))
-  (list
-    (stroke 8 (rgba 1.0 1.0 0.0 1.0) (vec 4 4))
-    (stroke 8 (rgba 0.0 1.0 1.0 1.0) (vec (- 4) 4))))
+[
+  [
+    stroke 8 #F00 (vec 4 (-4))
+    stroke 8 #00F (vec (-4) (-4))
+  ]
+  [
+    stroke 8 #FF0 (vec 4 4)
+    stroke 8 #0FF (vec (-4) 4)
+  ]
+]
 ```
+
+::: aside
+
+Another weird thing: when negating a number, you have to put it in parentheses.
+
+This is because haku does not see your spaces---`vec -4`, `vec - 4`, and `vec-4` all mean the same thing!
+In this case, it will always choose the 2nd interpretation---vec minus four.
+So to make it interpret our minus four as, well, _minus four_, we need to enclose it in parentheses.
+
+:::
 
 This might seem useless, but it's a really useful property in computer programs.
 It essentially means you can snap pieces together like Lego bricks!
@@ -120,122 +136,65 @@ Therefore, scribbles that are listed later will be drawn on top of scribbles tha
 Anyways!
 
 
-## So what's this ceremony with all the parentheses and such?
-
-::: aside
-
-I'm working on an improved syntax for haku that will get rid of the prevalence of parentheses.
-
-:::
+## So what's this ceremony with all the words and symbols?
 
 Recall that super simple brush from before...
 
 ```haku
-(stroke
-  8
-  (rgba 0.0 0.0 0.0 1.0)
-  (vec))
+stroke 8 #000 (vec 0 0)
 ```
 
-It'll be best to explain what happens here by example, so let's have a look at that singular `rgba` line.
+This reads as "a stroke that's 8 pixels wide, has the color `#000`, and is drawn at the point `(0, 0)` relative to the mouse cursor."
 
-```haku
-(rgba 0.0 0.0 0.0 1.0)
-```
+All these symbols are very meaningful to haku.
+If you reorder or remove any one of them, your brush isn't going to work!
 
-This is the syntax haku uses for representing RGBA colors.
+- Reading from left to right, we start with `stroke`.\
+  `stroke` is a _function_---a recipe for producing data!\
+  haku has [many such built-in recipes](/docs/system.html).
+  `stroke` is one of them.
 
-It looks simple enough, but we can dismantle it even further.
+  - Each function requires some amount of _arguments_.
+    These are the ingredients that will be used to produce our piece of data.\
+    In haku, we specify the arguments to a function by listing them on the same line as the function's name, one after another, separated by spaces.
 
-- There's the word `rgba`.
+- The first ingredient we need for a `stroke` is its _thickness_.
+  This is a plain old number, counted in pixels. We say we want a stroke of thickness `8`.
 
-- There are four number values, `0.0`, `0.0`, `0.0`, and `1.0`.
+- The second ingredient is the stroke's _color_.
+  haku uses the familiar hex code syntax `#RRGGBB` for colors, but it allows writing `#RGB` for brevity---`#08F` is the same as `#0088FF`.\
+  You can also specify an alpha channel, for transparent colors---`#RRGGBBAA`, or `#RGBA`.
 
-- All of this is wrapped in parentheses.
+- The third ingredient is the stroke's _position_.
 
-[*The parentheses are _very_ significant.*]{id=what-happens-if-you-remove-the-parentheses}
-If we remove them, our brush no longer runs, and instead fails with an error.
-
-```haku
-(stroke
-  8
-  rgba 0.0 0.0 0.0 1.0
-  (vec))
-```
-
-```
-14..18: undefined variable
-```
-
-So what's happening here?
-
-Put shortly, the parentheses are telling haku to _call a function._
-This is computer-speak for asking haku to _do_ something with data.
-
-In case of `(rgba 0.0 0.0 0.0 1.0)`, we're telling haku to create an RGBA color out of four numbers, which signify the Red, Green, Blue, and Alpha channels of our color.
-
-In computer-speak, `rgba` is a _function_, which we _call_ with _four number arguments_, and it _returns_ an RGBA color for us to use.
-
-If you've studied math in school, you can visualize haku functions as being very similar to mathematical functions.
-Both take in arguments, and both can be substituted for some results.
-Both also have domains---just as it's invalid to take the square root of a negative number, it is invalid to call `rgba` with something other than four numbers.
-
-haku defines many such ready-to-use functions.
-These functions make up the _system library_---just like in a real world library there are lots of books, the haku system library has lots of functions.
-We call it the _system_ library, because together with the programming language, they make up a system of rules, which we collectively call _haku_.
-
-Philosophy aside, you can reference all the functions from the system library in the [system library reference](/docs/system.html).
-
-Anyways, to finish off dismantling that entire `stroke` example---
-
-```haku
-(stroke
-  8
-  (rgba 0.0 0.0 0.0 1.0)
-  (vec))
-```
-
-Just like `rgba`, `vec` is also a system function.
-
-It's a function which produces a mathematical _vector_, which, in simple terms, is just a list of some numbers.
+Positions in haku are represented using mathematical _vectors_, which, when broken down into pieces, are just lists of some numbers.
 
 haku vectors however are a little more constrained, because they always contain _four_ numbers---this makes them _four-dimensional_.
 We call these four numbers X, Y, Z, and W respectively.
 
 Four is a useful number of dimensions to have, because it lets us do 3D math---which technically isn't built into haku, but if you want it, it's there.
-
 For most practical purposes, we'll only be using the first _two_ of the four dimensions though---X and Y. 
 This is because the wall is a 2D space---it's a flat surface with no depth.
 
-We most commonly use vectors to represent points on the wall.
-These points are always relative to some origin, which is located at the coordinates `(0, 0)`.
-In case of brushes, we consider the origin to be the located at the tip of the mouse cursor.
+It's important to know though that vectors don't mean much _by themselves_---rakugaki just chooses them to represent points on the wall, but in a flat 2D space, all points need to be relative to some _origin_---the vector `(0, 0)`.
+In brushes, this position is at the tip of the mouse cursor.
 
 Positive X coordinates go rightwards, and positive Y coordinates go downwards.
 Likewise, negative X coordinates go leftwards, and negative Y coordinates go upwards.
 
-::: aside
+---
 
-Many programming languages (and math libraries) make points a different type of data from vectors.
+Going back to the example though, `vec` is yet another function, except instead of producing strokes, it produces vectors!
 
-The reason for this is that it doesn't make sense to, for example, add points together.
-You can only add a vector to a point, which gives you a point, or a vector to a vector, which gives you a vector, but not a point to a point---because that operation simply doesn't make sense mathematically.
+Note how it's parenthesized though---recall that function arguments are separated with spaces, so if we didn't parenthesize the `vec`, we'd end up passing `vec`, `0`, and `0` back to `stroke`---which is far from what we want!
 
-haku goes with the simpler way of using one data type, because I've never found this to be useful in practice.
-In theory it can prevent bugs, but usually these bugs are easy enough to see and squash immediately.
+And with all that, we let haku mix all the ingredients together, and get a black dot under the cursor.
 
-:::
+```haku
+stroke 8 #000 (vec 0 0)
+```
 
-`(vec)` is a short way of saying, "a vector with all dimensions equal to zero."
-We could just as well write `(vec 0 0 0 0)`, but that's no fun to type every single time you'd like a zero vector.
-Therefore, in case of `vec`, haku allows you to omit any of the four arguments, and initializes them to zero for you.
-
-And lastly, there's the `stroke` function.
-It turns a stroke thickness (number,) color (`rgba`,) and position (vector,) into a scribble that we can draw on the wall.
-
-Just like cooking!
-You add eggs, milk, flour, some salt, and some sugar, mix them up, and you get pancake batter.
-In haku, you add thickness, color, and position, mix them together into a `stroke`, and get a little colored square on the wall!
+Nice!
 
 
 ## Shapes
@@ -250,15 +209,10 @@ Right now haku supports two additional shapes: rectangles and circles.
 You can try them out by playing with this brush!
 
 ```haku
-(list
-  (stroke
-    8
-    (rgba 1.0 0.0 0.0 1.0)
-    (circle (- 16) 0 16))
-  (stroke
-    8
-    (rgba 0.0 0.0 1.0 1.0)
-    (rect 0 (- 16) 32 32)))
+[
+  stroke 8 #F00 (circle (-16) 0 16)
+  stroke 8 #00F (rect 0 (-16) 32 32)
+]
 ```
 
 ::: aside
@@ -272,7 +226,7 @@ But let's not go down that rabbit hole.
 - `circle`s are made up of an X position, Y position, and radius.
   
 - `rect`s are made up of the (X and Y) position of their top-left corner, and a size (width and height).\
-  Our example produces a square, because the rectangle's width and height are the same!
+  Our example produces a square, because the rectangle's width and height are equal!
 
 ## Programming in haku
 
@@ -282,19 +236,21 @@ But if describing data was all we ever wanted, we could've just used any ol' dra
 Remember that example from before?
 
 ```haku
-(list
-  (stroke 8 (rgba 1.0 0.0 0.0 1.0) (vec 4 0))
-  (stroke 8 (rgba 0.0 0.0 1.0 1.0) (vec (- 4) 0)))
+[
+  stroke 8 #F00 (vec 4 0)
+  stroke 8 #00F (vec (-4) 0)
+]
 ```
 
 It has quite a bit of repetition in it.
 If we wanted to change the size of the points, we'd need to first update the stroke thickness...
 
 ```haku
-(list
-  ;       ↓
-  (stroke 4 (rgba 1.0 0.0 0.0 1.0) (vec 4 0))
-  (stroke 4 (rgba 0.0 0.0 1.0 1.0) (vec (- 4) 0)))
+[
+  stroke 4 #F00 (vec 4 0)
+  stroke 4 #00F (vec (-4) 0)
+        ---
+]
 ```
 
 ...twice of course, because we have two scribbles.
@@ -302,17 +258,19 @@ But now there's a gap between our points!
 So we also have to update their positions.
 
 ```haku
-(list
-  ;                                     ↓
-  (stroke 4 (rgba 1.0 0.0 0.0 1.0) (vec 2 0))
-  ;                                        ↓
-  (stroke 4 (rgba 0.0 0.0 1.0 1.0) (vec (- 2) 0)))
+[
+  stroke 4 #F00 (vec 2 0)
+                    ---
+  stroke 4 #00F (vec (-2) 0)
+                      --
+]
 ```
 
 Now imagine if we had four of those points.
 That's quite a lot of copy-pasting for such a simple thing!
 
 Luckily, haku has a solution for this: we can give a _name_ to a piece of data by using a _definition_, and then refer to that piece of data using that name we chose.
+Definitions are called _defs_ in short.
 
 ::: aside
 
@@ -326,48 +284,47 @@ Once you define a name, its associated data stays the same throughout the entire
 So we can define `thickness` to be `4`, and then use it in our scribbles.
 
 ```haku
-(def thickness 4)
+thickness = 4
 
-(list
-  (stroke thickness (rgba 1.0 0.0 0.0 1.0) (vec 2 0))
-  (stroke thickness (rgba 0.0 0.0 1.0 1.0) (vec (- 2) 0)))
-  ;       ^^^^^^^^^
+[
+  stroke thickness #F00 (vec 2 0)
+  stroke thickness #00F (vec (-2) 0)
+         ---------
+]
 ```
 
-`(def name data)` is a special construction in haku that tells the language "whenever we say `name`, we mean `data`."
-Unlike `list` or `stroke`, it is _not_ a function!
+`name = data` is a special operator in haku that tells the language "whenever we say `name`, we mean `data`."
 
-We cannot put `def`s in arbitrary places in our program, because it wouldn't make sense.
-What does it mean to have a stroke whose thickness is `(def meow 5)`?
+We cannot use it in arbitrary places in our program, because it wouldn't make sense.
+What does it mean to have a stroke whose thickness is `meow = 5`?
 
-To keep a consistent program structure, haku also forces all your `def`s to appear _before_ your scribble.
-You can think of the `def`s as a list of ingredients for the final scribble.
+To keep a consistent program structure, haku also forces all your defs to appear _before_ your scribble.
+You can think of the defs as a list of ingredients for the final scribble.
 Reading the ingredients can give you context as to what you're gonna be cooking, so it's useful to have them first!
 
-Anyways, we can likewise replace our `2` constants with a `def`:
+Anyways, we can likewise replace our `2` constants with a def:
 
 ```haku
-(def thickness 4)
-(def x-offset 2)
+thickness = 4
+xOffset = 2
 
-(list
-  (stroke thickness (rgba 1.0 0.0 0.0 1.0) (vec x-offset 0))
-  (stroke thickness (rgba 0.0 0.0 1.0 1.0) (vec (- x-offset) 0)))
-  ;       ^^^^^^^^^
+[
+  stroke thickness #F00 (vec xOffset 0)
+  stroke thickness #00F (vec (-xOffset) 0)
+         ---------
+]
 ```
 
-I chose the name `x-offset` because it demonstrates that names don't need to be made up of letters only.
-In fact, haku will be happy with any of the following characters:
-
-- lowercase and uppercase letters
-- numbers (as long as your name doesn't start with a number)
-- dashes `-` and underscores `_`
-- various symbols: `+`, `*`, `/`, `\`, `^`, `!`, `=`, `<`, `>`---these are mainly used in math functions like `+`, but nothing prevents you from using them yourself!
+Note how in haku, names may not contain spaces.
+We cannot have a variable called `x offset`, so we choose `xOffset` instead.
+This naming convention is known as `camelCase`, and is used everywhere throughout the haku system library.
 
 ::: aside
 
-Fancy symbols in names are typical of languages in the [Lisp](https://en.wikipedia.org/wiki/Lisp_%28programming_language%29) family.
-After all, since there are so few syntactic constructions---only literal values and lists---why not make the rest of the characters on your keyboard available for naming things?
+Of note is that haku names also cannot start with an uppercase letter.
+It's reserved syntax for the future.
+
+Right now the only names that start with an uppercase letter are the two booleans, `True` and `False`.
 
 :::
 
@@ -375,24 +332,27 @@ But now there's a problem.
 If we change our `thickness` back to `8`, our points will overlap!
 
 ```haku
-;              ↓
-(def thickness 8)
-(def x-offset 2)
+thickness = 8
+           ---
+xOffset = 2
 
-(list
-  (stroke thickness (rgba 1.0 0.0 0.0 1.0) (vec x-offset 0))
-  (stroke thickness (rgba 0.0 0.0 1.0 1.0) (vec (- x-offset) 0)))
+[
+  stroke thickness #F00 (vec xOffset 0)
+  stroke thickness #00F (vec (-xOffset) 0)
+]
 ```
 
-So we'll make our `x-offset` calculated dynamically from the `thickness`, to not have to update it every time.
+So we'll make our `xOffset` calculated dynamically from the `thickness`, to not have to update it every time.
 
 ```haku
-(def thickness 8)
-(def x-offset (/ thickness 2))
+thickness = 8
+xOffset = thickness / 2
+          -------------
 
-(list
-  (stroke thickness (rgba 1.0 0.0 0.0 1.0) (vec x-offset 0))
-  (stroke thickness (rgba 0.0 0.0 1.0 1.0) (vec (- x-offset) 0)))
+[
+  stroke thickness #F00 (vec xOffset 0)
+  stroke thickness #00F (vec (-xOffset) 0)
+]
 ```
 
 Try playing with the `thickness` now!
@@ -404,18 +364,14 @@ So far we've only been dealing with strokes.
 So why not switch it up a little and _fill in_ a shape?
 
 ```haku
-(fill
-  (rgba 0 0 0 1)
-  (circle 0 0 16))
+fill #000 (circle 0 0 16)
 ```
 
 How about... some transparency?
-Recall that `rgba` has a fourth Alpha parameter---in image manipulation, this parameter is used to control the _opacity_ of a color.
+Recall that colors can have an alpha component, so let's try using that!
 
 ```haku
-(fill
-  (rgba 0 0 0 0.1)
-  (circle 0 0 16))
+fill #0001 (circle 0 0 16)
 ```
 
 If you play around with this brush, you'll notice how the circles blend together really nicely.
@@ -424,42 +380,32 @@ That's the power of Alpha!
 Now let's see what happens if we draw two such circles on top of each other---one bigger, one smaller.
 
 ```haku
-(list
-  (fill
-    (rgba 0 0 0 0.1)
-    (circle 0 0 16))
-  (fill
-    (rgba 0 0 0 0.1)
-    (circle 0 0 32)))
+[
+  fill #0001 (circle 0 0 16)
+  fill #0001 (circle 0 0 32)
+]
 ```
 
 How about four?
 
 ```haku
-(list
-  (fill
-    (rgba 0 0 0 0.1)
-    (circle 0 0 8))
-  (fill
-    (rgba 0 0 0 0.1)
-    (circle 0 0 16))
-  (fill
-    (rgba 0 0 0 0.1)
-    (circle 0 0 24))
-  (fill
-    (rgba 0 0 0 0.1)
-    (circle 0 0 32)))
+[
+  fill #0001 (circle 0 0 8)
+  fill #0001 (circle 0 0 16)
+  fill #0001 (circle 0 0 24)
+  fill #0001 (circle 0 0 32)
+]
 ```
 
 Okay, this is starting to look interesting, but it's also getting super unwieldy code-wise!
 I mean, just look at these repeated lines...
 Doesn't that remind you of that previous code example?
-Could there be some way to cleverly use `def`s to make it more readable?
+Could there be some way to cleverly use defs to make it more readable?
 
-...Well, the problem here's that the values vary, while `def`s are constant!
-So no `def` in the world is going to save us here.
+...Well, the problem here's that the values vary, while defs are constant!
+So no def in the world is going to save us here.
 
-But what if we could `def` some _code_, and then weave our changing values into that?
+But what if we could def some _code_, and then weave our changing values into that?
 Or, maybe in other words, list a bunch of values, and then transform them into something else?
 
 ...We already have a tool for that!
@@ -469,16 +415,13 @@ Or, maybe in other words, list a bunch of values, and then transform them into s
 Just like haku defines a set of _system_ functions, we can create and define _our own_ functions too!
 
 In haku, functions are data like anything else.
-We create them using `fn`, which is yet another magical construct like `def`.
-Except because functions are real data, they're not as restricted as `def`s are---they behave like any other piece of data, such as numbers.
-We can give them names with `def`s, or we can pass them into other functions for further manipulation.
+We create them using the syntax `\x -> y`.
+Because they are data like anything else, we can give them names with defs, or we can pass them into other functions for further manipulation.
 
 ::: aside
 
 Actually, system functions are kind of special.
 For performance reasons, (and because I was hasty to get a working prototype,) they cannot be passed as arguments to other functions.
-
-It's why [the error message here is so cryptic](#what-happens-if-you-remove-the-parentheses).
 
 That'll need fixing!
 
@@ -487,34 +430,33 @@ That'll need fixing!
 Either way, let's define a function that'll make us those circles!
 
 ```haku
-(def splat
-  (fn (radius)
-    (fill
-      (rgba 0 0 0 0.1)
-      (circle 0 0 radius))))
+splat = \radius ->
+  fill #0001 (circle 0 0 radius)
 
-(list
-  (splat 8)
-  (splat 16)
-  (splat 24)
-  (splat 32))
+[
+  splat 8
+  splat 16
+  splat 24
+  splat 32
+]
 ```
 
 That's a lot nicer, isn't it---a template for our circles is neatly defined in a single place, and all we do is reuse it, each time with a different `radius`.
 
-To dismantle that `fn` literal...
+To dismantle that weird `\` syntax...
 
-- We have the special word `fn`, which is short for _*f*u*n*ction_.
+- The character `\` is a short way of saying _function of_.
+  It's supposed to resemble the Greek letter λ, but be easier to type on our antiquated ASCII keyboards.
 
-- We have a list of _parameters_.
+- After `\`, we have a list of _parameters_.
 
-  Parameters are the names we give to a function's arguments---for a function call `(splat 8)`, we need the function to have a name for that `8` datum that gets passed to it.
+  Parameters are the names we give to a function's arguments---for a function call `splat 8`, we need the function to have a name for that `8` datum that gets passed to it.
   Otherwise it has no way to use it!
 
-  A function can have an arbitrary number of parameters listed, and that many parameters _must_ be passed to it.
+  A function can have an arbitrary number of parameters listed, separated by commas, and that many parameters _must_ be passed to it.
   Otherwise your brush will fail with an error!
 
-- And lastly, we have the function's result.
+- And lastly, after an arrow `->`, we have the function's result.
 
   Note that a function can only have _one_ result, just like a brush can only have one scribble.
 
@@ -533,21 +475,19 @@ haku limits the use of overloading to system functions for simplicity---adding o
 Since these transparent circles are so much easier to draw now, let's make a few more of them!
 
 ```haku
-(def splat
-  (fn (radius)
-    (fill
-      (rgba 0 0 0 0.1)
-      (circle 0 0 radius))))
+splat = \radius ->
+  fill #0001 (circle 0 0 radius)
 
-(list
-  (splat 8)
-  (splat 16)
-  (splat 24)
-  (splat 32)
-  (splat 40)
-  (splat 48)
-  (splat 56)
-  (splat 64))
+[
+  splat 8
+  splat 16
+  splat 24
+  splat 32
+  splat 40
+  splat 48
+  splat 56
+  splat 64
+]
 ```
 
 Okay, I'll admit this is getting kind of dumb.
@@ -580,19 +520,16 @@ Until some threshold is reached, in which case we just make a single circle.
 The first part is easy to do: haku allows us to define a function that calls itself without making any fuss.
 
 ```haku
-(def splat
-  (fn (radius)
-    (fill
-      (rgba 0 0 0 0.1)
-      (circle 0 0 radius))))
+splat = \radius ->
+  fill #0001 (circle 0 0 radius)
 
-(def airbrush
-  (fn (size)
-    (list
-      (splat size)
-      (airbrush (- size 8)))))
+airbrush = \size ->
+  [
+    splat size
+    airbrush (size - 8)
+  ]
 
-(airbrush 64)  ; sounds like some Nintendo 64 game about graffiti, lol.
+airbrush 64 -- sounds like some Nintendo 64 game about graffiti, lol.
 ```
 
 But...
@@ -618,13 +555,15 @@ We call this act of switching execution paths _branching_.
 Try this out---change the `radius`, and observe how your brush changes color once you set it beyond 16:
 
 ```haku
-(def radius 8)
+radius = 8
 
-(fill
-  (if (< radius 16)
-    (rgba 0 0 1 1)
-    (rgba 1 0 0 1))
-  (circle 0 0 radius))
+color =
+  if (radius < 16)
+    #00F
+  else
+    #F00
+
+fill color (circle 0 0 radius)
 ```
 
 - `<` is a function that produces `true` if the second argument is a smaller number than the first argument.
@@ -639,21 +578,19 @@ An `if` only calculates the argument it needs to produce the result.
 This allows us to use it to prevent unbounded recursion in our `airbrush` example.
 
 ```haku
-(def splat
-  (fn (radius)
-    (fill
-      (rgba 0 0 0 0.1)
-      (circle 0 0 radius))))
+splat = \radius ->
+  fill #0001 (circle 0 0 radius)
 
-(def airbrush
-  (fn (size)
-    (if (> size 0)
-      (list
-        (splat size)
-        (airbrush (- size 8)))
-      (list))))
+airbrush = \size ->
+  if (size > 0)
+    [
+      splat size
+      airbrush (size - 8)
+    ]
+  else
+    []
 
-(airbrush 64)
+airbrush 64
 ```
 
 Neat!
@@ -666,43 +603,39 @@ But the airbrush still looks super primitive.
 Let's try increasing the fidelity by doing smaller steps!
 
 ```haku
-(def splat
-  (fn (radius)
-    (fill
-      (rgba 0 0 0 0.1)
-      (circle 0 0 radius))))
+splat = \radius ->
+  fill #0001 (circle 0 0 radius)
 
-(def airbrush
-  (fn (size)
-    (if (> size 0)
-      (list
-        (splat size)
-        ;                 ↓
-        (airbrush (- size 1)))
-      (list))))
+airbrush = \size ->
+  if (size > 0)
+    [
+      splat size
+      airbrush (size - 1)
+                      ---
+    ]
+  else
+    []
 
-(airbrush 64)
+airbrush 64
 ```
 
 Well... sure, that's just a black blob with a slight gradient on the outer edge, so let's decrease the opacity.
 
 ```haku
-(def splat
-  (fn (radius)
-    (fill
-      ;             ↓
-      (rgba 0 0 0 0.01)
-      (circle 0 0 radius))))
+splat = \radius ->
+  fill #00000004 (circle 0 0 radius)
+       ---------
 
-(def airbrush
-  (fn (size)
-    (if (> size 0)
-      (list
-        (splat size)
-        (airbrush (- size 1)))
-      (list))))
+airbrush = \size ->
+  if (size > 0)
+    [
+      splat size
+      airbrush (size - 1)
+    ]
+  else
+    []
 
-(airbrush 64)
+airbrush 64
 ```
 
 Looks good as a single dot, but if you try drawing with it... it's gray??

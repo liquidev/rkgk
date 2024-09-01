@@ -465,6 +465,8 @@ unsafe extern "C" fn haku_render_value(
     debug!("resetting exception");
     instance.exception = None;
 
+    debug!("will render value: {:?}", instance.value);
+
     let pixmap_locked = &mut (*pixmap).pixmap;
 
     let mut renderer = Renderer::new(

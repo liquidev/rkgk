@@ -9,230 +9,243 @@ Each function comes with a _signature description_.
 These descriptions read like this:
 
 ```haku
-(stroke
-  (thickness number)
-  (color rgba)
-  (position vec)
-  scribble)
+stroke
+  thickness : number
+  color : rgba
+  position : vec
+  -> scribble
 ```
 
 The first element is always the function's name - in this case `stroke`.
-Following this are `(argument-name argument-type)` pairs, which describe the arguments that need to be passed to the function.
+Following this are `argumentName : argumentType` pairs, which describe the arguments that need to be passed to the function.
 The last element is always the type of data this function produces.
+
+Function names which are made up of symbols instead of letters are _operators_.
+Operators may have one or two arguments, where one argument corresponds to a prefix form `-x`, and two arguments correspond to an infix form `x - y`.
+Note that this documentation lists a unary and binary operator of the same spelling as _two separate functions_, not overloads of a single function.
 
 The argument name usually does not matter when calling the function - it is only used for documentation purposes.
 The one exception is arguments called `...`, which signify that zero or more arguments can be passed to the function at that position.
+(Currently there are no functions that accept any number of arguments, though.)
 
 The argument _type_ however is important.
 If you try to use a function with the wrong type of value as its argument, it will fail with an error.
 For example, consider a brush where we pass a number as `stroke`'s `color` and `position` arguments.
 
 ```haku
-(stroke 1 1 1)
+stroke 1 1 1
 ```
 
 This brush will fail to render, since `stroke` expects an `rgba` as its 2nd argument.
 
 With that said, there are several types of values in haku that can be passed into, and returned by functions.
 
-- `*` - special type used to signify that any value may be passed into the function.
+- `_` - special type used to signify that any value may be passed into the function.
 - `()` - also known as _nil_, means _no value._
-- `boolean` - either `false` or `true`. Indicates truth or falsehood, used in `if` conditions.
+- `boolean` - either `False` or `True`. Indicates truth or falsehood, used in `if` conditions.
 - `number` - a real number, with 32 bits of precision.
 - `vec` - a 4-dimensional vector, composed of four `number`s.
 - `rgba` - an RGBA color, composed of four `number`s.
-- `fn` - a function, as returned by `(fn (x) x)` literals.
-- `list` - a list of values, where each value can have a different type (even `list` itself.)
+- `\a -> r` - a function taking in the parameter `a` and returning `r`, as returned by `\x -> x` literals.
+- `list t` - a list of values, where each value is of the type `t`.
 - `shape` - a mathematical shape.
 
-  - `shape-like` - anything that can be turned into a `shape` using `to-shape`.
+  - `shapeLike` - anything that can be turned into a `shape` using `toShape`.
 
 - `scribble` - something that can be drawn on the wall.
 
-Additionally, the syntax `(type-a type-b ...)` may be used to signify that one of the listed types is accepted or returned. 
+Additionally, the syntax `a | b` may be used to signify that one of the listed types is accepted or returned. 
+
 
 ## Math
 
 ```haku
-(+
-  (... number)
-  number)
+-
+  a : number
+  -> number
 ```
 
-`+` takes an arbitrary amount of arguments and sums them together.
-When there are zero arguments, it returns `0`.
+`-`, when used in its unary form `-x`, returns the number `x` with the opposite sign.
 
 ```haku
-(-
-  (a number)
-  (... number)
-  number)
++
+  a : number
+  b : number
+  -> number
 ```
 
-When there is only one argument, `-` returns `a` with the opposite sign.
-Otherwise, it performs an arbitrary amount of subtractions from `a`, and returns the result.
-Note that unlike `+` and `*`, at least one argument must be present.
-
-haku does not have syntactic support for negative numbers - the proper way to negate a number is using this function `(- 1)`.
+`+` adds two numbers together.
 
 ```haku
-(*
-  (... number)
-  number)
+-
+  a : number
+  b : number
+  -> number
 ```
 
-`*` takes an arbitrary amount of arguments and multiplies them together.
-When there are zero arguments, it returns `1`.
+`-`, when used in its binary form `x - y`, subtracts two numbers from one another.
 
 ```haku
-(/
-  (a number)
-  (... number)
-  number)
+*
+  a : number
+  b : number
+  -> number
 ```
 
-`/` returns `a` divided by all the numbers from `...`.
-Note that unlike `+` and `*`, at least one argument must be present.
+`*` multiplies two numbers together.
+
+```haku
+/
+  a : number
+  b : number
+  -> number
+```
+
+`/` divides a number by another number.
+
 
 ## Logic
 
 The following functions are used to compare values and work with `boolean`s.
 
 ```haku
-(not
-  (b *)
-  boolean)
+!
+  a : _
+  -> boolean
 ```
 
-If `b` is `()` or `false`, `not` returns `true`.
-Otherwise it returns `false`.
+If `b` is `()` or `False`, `not` returns `true`.
+Otherwise it returns `False`.
 
 ```haku
-(=
-  (a *)
-  (b *)
-  boolean)
+==
+  a : _
+  b : _
+  -> boolean
 
-(<>
-  (a *)
-  (b *)
-  boolean)
+!=
+  a : _
+  b : _
+  -> boolean
 ```
 
-`=` returns `true` if `a` and `b` are equal.
+`==` returns `True` if `a` and `b` are equal.
 Whether two values are considered equal depends on their type:
 
-- If the type of the two values differs, `false` is returned.
+- If the type of the two values differs, `False` is returned.
 - If the two values are `number`s:
 
-  - If any of the values are `NaN`, `false` is returned.
-  - Otherwise `true` is returned if the two numbers have the exact same bit representation.
+  - If any of the values are `NaN`, `False` is returned.
+  - Otherwise `True` is returned if the two numbers have the exact same bit representation.
 
-- If the two values are `vec`s, `true` is returned if each of their `number` components is equal to each other using the rules above.
+- If the two values are `vec`s, `True` is returned if each of their `number` components is equal to each other using the rules above.
 - Likewise with `rgba`s.
-- All other types of values use _reference_ equality - `true` is returned only if `a` and `b` are located in the same place in memory.
+- All other types of values use _reference_ equality - `True` is returned only if `a` and `b` are located in the same place in memory.
   This more or less means that the values are considered equal if they are produced by the same call to a system function, in time.
 
-`<>` returns `(not (= a b))`.
+`!=` returns `!(a == b)`.
 
 ```haku
-(<
-  (a *)
-  (b *)
-  boolean)
+<
+  a : _
+  b : _
+  -> boolean
 
-(<=
-  (a *)
-  (b *)
-  boolean)
+<=
+  a : _
+  b : _
+  -> boolean
 
-(>
-  (a *)
-  (b *)
-  boolean)
+>
+  a : _
+  b : _
+  -> boolean
 
-(>=
-  (a *)
-  (b *)
-  boolean)
+>=
+  a : _
+  b : _
+  -> boolean
 ```
 
-`<` returns `true` if `a` is less than `b`, and `<=` returns `true` if `a` is less than _or_ equal to `b`.
+`<` returns `True` if `a` is less than `b`, and `<=` returns `True` if `a` is less than _or_ equal to `b`.
 
 Order is only well-defined for numbers.
-Other types may assume an arbitrary but consistent ordering - `()` may be less than `true`, or it may not be less than `true`, but this will not change between executions of the program.
+Other types may assume an arbitrary but consistent ordering - `()` may be less than `True`, or it may not be less than `True`, but this will not change between executions of the program.
 
-`(> a b)` is the same as `(< b a)`.
-`(>= a b)` is the same as `(<= b a)`.
+`a > b` is the same as `b < a`.
+`a >= b` is the same as `b <= a`.
 
 ---
 
-Note that `and` and `or` are currently missing from this list.
+Note that `and` and `or` are currently missing from this list, but are reserved keywords.
 You can implement them using regular functions as a replacement.
 
 ```haku
-(def and
-  (fn (a b)
-    (if a (if b true false) false)))
+boolAnd = \a, b ->
+  if (a)
+    if (b) True
+    else False
+  else False
 
-(def or
-  (fn (a b)
-    (if a true (if b true false))))
+boolOr = \a, b ->
+  if (a)
+    True
+  else
+    if (b) True
+    else False
 ```
+
 
 ## Vectors
 
 ```haku
-(vec
-  vec)
+vec
+  x : number
+  -> vec
 
-(vec
-  (x number)
-  vec)
+vec
+  x : number
+  y : number
+  -> vec
 
-(vec
-  (x number)
-  (y number)
-  vec)
+vec
+  x : number
+  y : number
+  z : number
+  -> vec
 
-(vec
-  (x number)
-  (y number)
-  (z number)
-  vec)
-
-(vec
-  (x number)
-  (y number)
-  (z number)
-  (w number)
-  vec)
+vec
+  x : number
+  y : number
+  z : number
+  w : number
+  -> vec
 ```
 
-Creates a new `vec` from zero to four number values.
+Creates a new `vec` from one to four number values.
 
 A `vec` always has four dimensions.
 If any of the arguments are omitted, its corresponding dimension is initialized to zero.
 
 ```haku
-(.x
-  (v vec)
-  number)
+vecX
+  v : vec
+  -> number
 
-(.y
-  (v vec)
-  number)
+vecY
+  v : vec
+  -> number
 
-(.z
-  (v vec)
-  number)
+vecZ
+  v : vec
+  -> number
 
-(.w
-  (v vec)
-  number)
+vecW
+  v : vec
+  -> number
 ```
 
-`.x`, `.y`, `.z`, and `.w` extract the individual components of a `vec`.
+`vecX`, `vecY`, `vecZ`, and `vecW` extract the individual components of a `vec`.
 
 ---
 
@@ -240,61 +253,54 @@ Note that mathematical operations are currently not defined for vectors.
 You may define your own vector operations like so:
 
 ```haku
-(def +v  ; Vector addition
-  (fn (a b)
-    (vec
-      (+ (.x a) (.x b))
-      (+ (.y a) (.y b))
-      (+ (.z a) (.z b))
-      (+ (.w a) (.w b)))))
+-- Vector addition
+addv = \a, b ->
+  vec (vecX a + vecX b) (vecY a + vecY b) (vecZ a + vecZ b) (vecW a + vecW b)
 
-; Likewise for subtraction, multiplication, and division.
+-- Likewise for subtraction, multiplication, and division.
 ```
 
 Note that haku-defined vector operations like these are more costly the more components they operate on.
 Therefore, it's recommended to only define them for two dimensions, unless you really need more.
 
 ```haku
-(def +v2  ; 2D vector addition
-  (fn (a b)
-    (vec
-      (+ (.x a) (.x b))
-      (+ (.y a) (.y b)))))
+addv2 = \a, b ->
+  vec (vecX a + vecX b) (vecY a + vecY b)
 ```
 
 ## Colors
 
 ```haku
-(rgba
-  (r number)
-  (g number)
-  (b number)
-  (a number)
-  rgba)
+rgba
+  r : number
+  g : number
+  b : number
+  a : number
+  -> rgba
 ```
 
 Creates a new `rgba` with the given color channels.
 Note that unlike `vec`, all color channels have to be provided to form an `rgba`.
 
 ```haku
-(.r
-  (color rgba)
-  number)
+rgbaR
+  color : rgba
+  -> number
 
-(.g
-  (color rgba)
-  number)
+rgbaG
+  color : rgba
+  -> number
 
-(.b
-  (color rgba)
-  number)
+rgbaB
+  color : rgba
+  -> number
 
-(.a
-  (color rgba)
-  number)
+rgbaA
+  color : rgba
+  -> number
 ```
 
-`.r`, `.g`, `.b`, and `.a` extract color channels out of an `rgba`.
+`rgbaR`, `rgbaG`, `rgbaB`, `rgbaA` extract color channels out of an `rgba`.
 
 ---
 
@@ -304,26 +310,20 @@ For example, consider multiplicatively blending two colors.
 
 ```haku
 ; This is how you can multiply two colors together.
-(def *rgba
-  (fn (a b)
-    (rgba
-      (* (.r a) (.r b))
-      (* (.g a) (.g b))
-      (* (.b a) (.b b))
-      (* (.a a) (.a b)))))
+mulRgba = \a, b ->
+  rgba (rgbaR a * rgbaR b) (rgbaG a * rgbaG b) (rgbaB a * rgbaB b) (rgbaA a * rgbaA b)
 ```
 
 If haku represented colors using an 8-bit `0` to `255` range instead, to multiply two colors together, you would have to divide them by `255` to get them back into the correct range.
 
 ```haku
 ; NOTE: This example does NOT work correctly.
-(def *rgba
-  (fn (a b)
-    (rgba
-      (/ (* (.r a) (.r b)) 255)
-      (/ (* (.g a) (.g b)) 255)
-      (/ (* (.b a) (.b b)) 255)
-      (/ (* (.a a) (.a b)) 255))))
+mulRgba = \a, b ->
+  let red = (rgbaR a * rgbaR b) / 255
+  let green = (rgbaG a * rgbaG b) / 255
+  let blue = (rgbaB a * rgbaB b) / 255
+  let alpha = (rgbaA a * rgbaA b) / 255
+  rgba red green blue alpha
 ```
 
 Note that haku does not clamp colors to the `0` to `1` range.
@@ -339,33 +339,18 @@ Before scribbles are drawn to the wall, colors are converted to 8-bit integers f
 This means some loss of precision will happen, which may cause issues with brushes like this one:
 
 ```haku
-(stroke
-  128
-  (rgba 0 0 0 0.1)
-  (vec))
+stroke 128 #00000004 (vec 0 0)
 ```
 
 If you try to to use this brush to fill up a single spot with black, you will notice that despite all the math suggesting so, the color will end up gray instead.
 
-## Data structures
-
-```haku
-(list
-  (... *)
-  list)
-```
-
-`list` is used to construct a new list.
-
-Currently, lists do not have any operations defined on them.
-However, lists made up solely of scribbles are scribbles themselves, which allows for combining scribbles together.
 
 ## Shapes
 
 ```haku
-(to-shape
-  (value *)
-  (() shape))
+toShape
+  value : _
+  -> () | shape
 ```
 
 Converts the given value to a shape.
@@ -375,26 +360,26 @@ Converts the given value to a shape.
 - For anything else, returns `()`.
 
 ```haku
-(line
-  (start vec)
-  (end vec)
-  shape)
+line
+  start : vec
+  end : vec
+  -> shape
 ```
 
 Creates a line segment shape with the provided `start` and `end` points.
 
 ```haku
-(rect
-  (position vec)
-  (size vec)
-  shape)
+rect
+  position : vec
+  size : vec
+  -> shape
 
-(rect
-  (x number)
-  (y number)
-  (width number)
-  (height number)
-  shape)
+rect
+  x : number
+  y : number
+  width : number
+  height : number
+  -> shape
 ```
 
 Creates a rectangle shape with its top-left corner at `position`, with a given `size` stretching from the top-left corner.
@@ -402,16 +387,16 @@ Creates a rectangle shape with its top-left corner at `position`, with a given `
 The alternative 4-argument version takes in the rectangle's X/Y coordinates, width, and height as separate arguments instead of aggregating them into a `vec`.
 
 ```haku
-(circle
-  (center vec)
-  (radius number)
-  shape)
+circle
+  center : vec
+  radius : number
+  -> shape
 
-(circle
-  (x number)
-  (y number)
-  (radius number)
-  shape)
+circle
+  x : number
+  y : number
+  radius : number
+  -> shape
 ```
 
 Creates a circle shape, with its center at `center`, with the provided radius.
@@ -421,11 +406,11 @@ The alternative 3-argument version takes in the circle's center X/Y coordinates 
 ## Scribbles
 
 ```haku
-(stroke
-  (thickness number)
-  (color rgba)
-  (shape shape-like)
-  scribble)
+stroke
+  thickness : number
+  color : rgba
+  shape : shapeLike
+  -> scribble
 ```
 
 Creates a stroke scribble, which outlines the provided shape with a stroke of the given thickness and color.
@@ -433,10 +418,10 @@ Creates a stroke scribble, which outlines the provided shape with a stroke of th
 Point shapes are drawn as squares, and `line` shapes have square caps at the line's endpoints.
 
 ```haku
-(fill
-  (color rgba)
-  (shape shape-like)
-  scribble)
+fill
+  color : rgba
+  shape : shapeLike
+  -> scribble
 ```
 
 Creates a fill scribble, which fills in the entire area of the provided shape with a solid color.

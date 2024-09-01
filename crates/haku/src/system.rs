@@ -143,7 +143,8 @@ pub mod fns {
             0x88 Nary "rgbaB" => rgba_b,
             0x89 Nary "rgbaA" => rgba_a,
 
-            0x90 Nary "list" => list,
+            // NOTE: Not used right now, has been replaced with Opcode::List.
+            0x90 Nary "list (unused)" => list,
 
             0xc0 Nary "toShape" => to_shape_f,
             0xc1 Nary "line" => line,

@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+log.workspace = true
 tiny-skia = { version = "0.11.4", default-features = false, features = ["no-std-float"] }

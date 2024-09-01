@@ -309,7 +309,7 @@ This is because it's easier to do math on normalized colors.
 For example, consider multiplicatively blending two colors.
 
 ```haku
-; This is how you can multiply two colors together.
+-- This is how you can multiply two colors together.
 mulRgba = \a, b ->
   rgba (rgbaR a * rgbaR b) (rgbaG a * rgbaG b) (rgbaB a * rgbaB b) (rgbaA a * rgbaA b)
 ```
@@ -317,7 +317,7 @@ mulRgba = \a, b ->
 If haku represented colors using an 8-bit `0` to `255` range instead, to multiply two colors together, you would have to divide them by `255` to get them back into the correct range.
 
 ```haku
-; NOTE: This example does NOT work correctly.
+-- NOTE: This example does NOT work correctly.
 mulRgba = \a, b ->
   let red = (rgbaR a * rgbaR b) / 255
   let green = (rgbaG a * rgbaG b) / 255

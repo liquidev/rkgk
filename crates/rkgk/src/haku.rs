@@ -18,6 +18,7 @@ use haku::{
     vm::{Vm, VmImage, VmLimits},
 };
 use serde::{Deserialize, Serialize};
+use tracing::{info, instrument, Level};
 
 use crate::schema::Vec2;
 
@@ -91,7 +92,10 @@ impl Haku {
         self.defs.restore_image(&self.defs_image);
     }
 
+    #[instrument(skip(self, code), err)]
     pub fn set_brush(&mut self, code: &str) -> eyre::Result<()> {
+        info!(?code);
+
         self.reset();
 
         let code = SourceCode::limited_len(code, self.limits.max_source_code_len)
@@ -127,15 +131,19 @@ impl Haku {
             || !parser_diagnostics.is_empty()
             || !compiler.diagnostics.is_empty()
         {
+            info!(?lexer.diagnostics, ?parser_diagnostics, ?compiler.diagnostics, "diagnostics were emitted");
             bail!("diagnostics were emitted");
         }
 
         let chunk_id = self.system.add_chunk(chunk).context("too many chunks")?;
         self.brush = Some((chunk_id, closure_spec));
 
+        info!("brush set successfully");
+
         Ok(())
     }
 
+    #[instrument(skip(self), err(level = Level::INFO))]
     pub fn eval_brush(&mut self) -> eyre::Result<Value> {
         let (chunk_id, closure_spec) = self
             .brush
@@ -156,6 +164,7 @@ impl Haku {
         Ok(scribble)
     }
 
+    #[instrument(skip(self, pixmap, value, translation), err(level = Level::INFO))]
     pub fn render_value(
         &self,
         pixmap: &mut Pixmap,

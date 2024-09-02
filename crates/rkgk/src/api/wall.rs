@@ -21,7 +21,7 @@ use tokio::{
     select,
     sync::{mpsc, oneshot},
 };
-use tracing::{error, instrument};
+use tracing::{error, info, info_span, instrument};
 
 use crate::{
     haku::{Haku, Limits},
@@ -29,7 +29,7 @@ use crate::{
     schema::Vec2,
     wall::{
         self, auto_save::AutoSave, chunk_images::ChunkImages, chunk_iterator::ChunkIterator,
-        database::ChunkDataPair, ChunkPosition, JoinError, SessionHandle, UserInit, Wall,
+        database::ChunkDataPair, ChunkPosition, JoinError, SessionHandle, UserInit, Wall, WallId,
     },
 };
 
@@ -190,6 +190,7 @@ async fn fallible_websocket(api: Arc<Api>, ws: &mut WebSocket) -> eyre::Result<(
     // to remind us about unexpected nulls.
 
     SessionLoop::start(
+        wall_id,
         open_wall.wall,
         open_wall.chunk_images,
         open_wall.auto_save,
@@ -205,6 +206,7 @@ async fn fallible_websocket(api: Arc<Api>, ws: &mut WebSocket) -> eyre::Result<(
 }
 
 struct SessionLoop {
+    wall_id: WallId,
     wall: Arc<Wall>,
     chunk_images: Arc<ChunkImages>,
     auto_save: Arc<AutoSave>,
@@ -230,6 +232,7 @@ enum RenderCommand {
 
 impl SessionLoop {
     async fn start(
+        wall_id: WallId,
         wall: Arc<Wall>,
         chunk_images: Arc<ChunkImages>,
         auto_save: Arc<AutoSave>,
@@ -253,11 +256,17 @@ impl SessionLoop {
             .name(String::from("haku render thread"))
             .spawn({
                 let wall = Arc::clone(&wall);
-                move || Self::render_thread(wall, limits, render_commands_rx)
+                move || {
+                    let _span =
+                        info_span!("render_thread", %wall_id, session_id = ?handle.session_id)
+                            .entered();
+                    Self::render_thread(wall, limits, render_commands_rx)
+                }
             })
             .context("could not spawn render thread")?;
 
         Ok(Self {
+            wall_id,
             wall,
             chunk_images,
             auto_save,
@@ -269,6 +278,7 @@ impl SessionLoop {
         })
     }
 
+    #[instrument(skip(self, ws), fields(wall_id = %self.wall_id, session_id = ?self.handle.session_id))]
     async fn event_loop(&mut self, ws: &mut WebSocket) -> eyre::Result<()> {
         loop {
             select! {
@@ -317,10 +327,18 @@ impl SessionLoop {
                                 // Theoretically this will yield much better responsiveness, but it _will_
                                 // result in some visual glitches if we're getting bottlenecked.
                                 let (done_tx, done_rx) = oneshot::channel();
-                                _ = self.render_commands_tx.try_send(RenderCommand::Plot {
-                                    points: points.clone(),
-                                    done: done_tx,
-                                });
+                                let send_result =
+                                    self.render_commands_tx.try_send(RenderCommand::Plot {
+                                        points: points.clone(),
+                                        done: done_tx,
+                                    });
+
+                                if send_result.is_err() {
+                                    info!(
+                                        ?points,
+                                        "render thread is overloaded, dropping request to draw points"
+                                    );
+                                }
 
                                 let auto_save = Arc::clone(&self.auto_save);
                                 tokio::spawn(async move {

@@ -337,10 +337,19 @@ unsafe extern "C" fn haku_compile_brush(
         return StatusCode::SourceCodeTooLong;
     };
 
+    debug!("compiling: lexing");
+
     let mut lexer = Lexer::new(Lexis::new(instance.limits.max_tokens), code);
     if lex(&mut lexer).is_err() {
+        info!("compiling failed: too many tokens");
         return StatusCode::TooManyTokens;
     };
+
+    debug!(
+        "compiling: lexed successfully to {} tokens",
+        lexer.lexis.len()
+    );
+    debug!("compiling: parsing");
 
     let mut ast = Ast::new(instance.limits.ast_capacity);
     let mut parser = Parser::new(
@@ -352,9 +361,20 @@ unsafe extern "C" fn haku_compile_brush(
     parser::toplevel(&mut parser);
     let (root, mut parser_diagnostics) = match parser.into_ast(&mut ast) {
         Ok((r, d)) => (r, d),
-        Err(IntoAstError::NodeAlloc(_)) => return StatusCode::TooManyAstNodes,
-        Err(IntoAstError::UnbalancedEvents) => return StatusCode::ParserUnbalancedEvents,
+        Err(IntoAstError::NodeAlloc(_)) => {
+            info!("compiling failed: too many AST nodes");
+            return StatusCode::TooManyAstNodes;
+        }
+        Err(IntoAstError::UnbalancedEvents) => {
+            info!("compiling failed: parser produced unbalanced events");
+            return StatusCode::ParserUnbalancedEvents;
+        }
     };
+
+    debug!(
+        "compiling: parsed successfully into {} AST nodes",
+        ast.len()
+    );
 
     let src = Source {
         code,
@@ -366,7 +386,10 @@ unsafe extern "C" fn haku_compile_brush(
     let mut compiler = Compiler::new(&mut instance.defs, &mut chunk);
     if let Err(error) = compile_expr(&mut compiler, &src, root) {
         match error {
-            CompileError::Emit => return StatusCode::ChunkTooBig,
+            CompileError::Emit => {
+                info!("compiling failed: chunk overflowed while emitting code");
+                return StatusCode::ChunkTooBig;
+            }
         }
     }
     let closure_spec = compiler.closure_spec();
@@ -376,8 +399,15 @@ unsafe extern "C" fn haku_compile_brush(
     diagnostics.append(&mut compiler.diagnostics);
     if !diagnostics.is_empty() {
         brush.diagnostics = diagnostics;
+        debug!("compiling failed: diagnostics were emitted");
         return StatusCode::DiagnosticsEmitted;
     }
+
+    debug!(
+        "compiling: chunk has {} bytes of bytecode",
+        chunk.bytecode.len()
+    );
+    debug!("compiling: {closure_spec:?}");
 
     let chunk_id = match instance.system.add_chunk(chunk) {
         Ok(chunk_id) => chunk_id,

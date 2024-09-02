@@ -20,13 +20,23 @@ export class User {
     }
 
     setBrush(brush) {
+        console.group("setBrush", this.nickname);
         let compileResult = this.haku.setBrush(brush);
+        console.log("compiling brush complete", compileResult);
+        console.groupEnd();
+
         this.isBrushOk = compileResult.status == "ok";
+
         return compileResult;
     }
 
     renderBrushToChunks(wall, x, y) {
-        return this.painter.renderBrushToWall(this.haku, x, y, wall);
+        console.group("renderBrushToChunks", this.nickname);
+        let result = this.painter.renderBrushToWall(this.haku, x, y, wall);
+        console.log("rendering brush to chunks complete");
+        console.groupEnd();
+
+        return result;
     }
 }
 

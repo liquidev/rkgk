@@ -74,6 +74,14 @@ impl Ast {
         ast
     }
 
+    pub fn len(&self) -> usize {
+        self.kinds.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn alloc(&mut self, kind: NodeKind, span: Span) -> Result<NodeId, NodeAllocError> {
         if self.kinds.len() >= self.kinds.capacity() {
             return Err(NodeAllocError);

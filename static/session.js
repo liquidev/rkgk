@@ -75,6 +75,8 @@ export async function registerUser(nickname) {
 }
 
 class Session extends EventTarget {
+    #sentPing = false;
+
     constructor(userId, secret) {
         super();
         this.userId = userId;
@@ -193,6 +195,8 @@ class Session extends EventTarget {
     }
 
     async eventLoop() {
+        this.#pingLoop();
+
         try {
             while (true) {
                 let event = await listen([this.ws, "message"]);
@@ -207,7 +211,21 @@ class Session extends EventTarget {
         }
     }
 
+    #pingLoop() {
+        // Send small ping packets every 30 seconds to prevent reverse proxies from reaping the
+        // connection if the tab is in the background.
+        // (Browsers don't seem to send standard WebSocket pings if the tab is unfocused.)
+        // We don't actually use this packet for anything else, like establishing whether
+        // we still have a connection to the server, because the browser can handle that for us.
+        setInterval(() => this.sendPing(), 30000);
+    }
+
     async #processNotify(notify) {
+        if (notify.notify == "pong") {
+            console.debug("pong received");
+            this.#sentPing = false;
+        }
+
         if (notify.notify == "wall") {
             this.dispatchEvent(
                 Object.assign(new Event("wallEvent"), {
@@ -226,6 +244,16 @@ class Session extends EventTarget {
                     hasMore: notify.hasMore,
                 }),
             );
+        }
+    }
+
+    sendPing() {
+        if (!this.#sentPing) {
+            console.debug("ping sent; waiting for pong");
+            this.#sendJson({
+                request: "ping",
+            });
+            this.#sentPing = true;
         }
     }
 

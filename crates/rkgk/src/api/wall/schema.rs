@@ -69,6 +69,8 @@ pub enum LoginResponse {
     rename_all_fields = "camelCase"
 )]
 pub enum Request {
+    Ping,
+
     Wall {
         wall_event: wall::EventKind,
     },
@@ -95,6 +97,8 @@ pub struct ChunkInfo {
     rename_all_fields = "camelCase"
 )]
 pub enum Notify {
+    Pong,
+
     Wall {
         wall_event: wall::Event,
     },

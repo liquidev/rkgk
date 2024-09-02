@@ -300,6 +300,10 @@ impl SessionLoop {
 
     async fn process_request(&mut self, ws: &mut WebSocket, request: Request) -> eyre::Result<()> {
         match request {
+            Request::Ping => {
+                ws.send(to_message(&Notify::Pong)).await?;
+            }
+
             Request::Wall { wall_event } => {
                 match &wall_event {
                     // This match only concerns itself with drawing-related events to offload

@@ -266,3 +266,18 @@ fn system_arithmetic() {
     expect_number("1 + 2 + 3 + 4", 10.0, 0.0001);
     expect_number("(2 * 1) + 1 + (6 / 2) + (10 - 3)", 13.0, 0.0001);
 }
+
+#[test]
+fn issue_78() {
+    let code = r#"
+        f = \_ ->
+            let x = 1
+            x + x
+
+        [
+            f ()
+            f ()
+        ]
+    "#;
+    assert_eq!(eval(code).unwrap(), Value::Ref(RefId::from_u32(2)))
+}

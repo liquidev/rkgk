@@ -210,6 +210,7 @@ impl Vm {
                 .checked_sub(1)
                 .ok_or_else(|| self.create_exception("code ran for too long"))?;
 
+            #[allow(unused)]
             let pc2 = pc;
             let opcode = chunk.read_opcode(&mut pc)?;
             vmtrace!("{pc2:2} {opcode:?}");
@@ -245,7 +246,7 @@ impl Vm {
                 Opcode::SetLocal => {
                     let index = chunk.read_u8(&mut pc)? as usize;
                     let new_value = self.pop()?;
-                    *self.get_mut(index)? = new_value;
+                    *self.get_mut(bottom + index)? = new_value;
                 }
 
                 Opcode::Capture => {

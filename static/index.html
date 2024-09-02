@@ -17,6 +17,7 @@
         <script src="static/canvas-renderer.js" type="module"></script>
         <script src="static/connection-status.js" type="module"></script>
         <script src="static/framework.js" type="module"></script>
+        <script src="static/resize-handle.js" type="module"></script>
         <script src="static/reticle-renderer.js" type="module"></script>
         <script src="static/session.js" type="module"></script>
         <script src="static/throbber.js" type="module"></script>
@@ -43,13 +44,20 @@
         <main>
             <rkgk-canvas-renderer class="fullscreen"></rkgk-canvas-renderer>
             <rkgk-reticle-renderer class="fullscreen"></rkgk-reticle-renderer>
-            <div class="panels fullscreen">
+            <div class="panels fullscreen" id="panels-overlay">
                 <div class="rkgk-panel menu-bar">
                     <a class="icon icon-rkgk-grayscale" title="I know this menu bar is really ugly. Sorry about that."></a>
                     <hr>
                     <a href="/docs/rkgk.html">Manual</a>
                 </div>
-                <rkgk-brush-editor></rkgk-brush-editor>
+                <div class="right">
+                    <rkgk-resize-handle
+                        data-direction="vertical"
+                        data-target="panels-overlay"
+                        data-target-property="--right-width"
+                        data-init-size="384"></rkgk-resize-handle>
+                    <rkgk-brush-editor></rkgk-brush-editor>
+                </div>
             </div>
 
             <rkgk-welcome>

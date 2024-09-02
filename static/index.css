@@ -22,11 +22,13 @@ main {
     }
 
     &>.panels {
+        --right-width: 384px; /* Overridden by JavaScript */
+        
         box-sizing: border-box;
         padding: 16px;
 
         display: grid;
-        grid-template-columns: [left] 1fr [right] 384px;
+        grid-template-columns: [left] 1fr [right-resize] auto [right] var(--right-width);
 
         /* Pass all events through. Children may receive events as normal. */
         pointer-events: none;
@@ -35,11 +37,24 @@ main {
             pointer-events: all;
         }
 
-        &>rkgk-brush-editor {
+        &>.right {
             grid-column: right / right;
             height: fit-content;
-            max-height: 100%;
-            overflow: auto;
+
+            display: flex;
+            flex-direction: row;
+            justify-content: stretch;
+
+            &>rkgk-resize-handle {
+                flex-shrink: 0;
+                height: auto;
+            }
+
+            &>rkgk-brush-editor {
+                max-height: 100%;
+                overflow: auto;
+                flex-grow: 1;
+            }
         }
     }
 
@@ -60,10 +75,6 @@ main {
         overflow: hidden;
     }
 
-    &>rkgk-brush-editor {
-        width: 384px;
-    }
-
     &>#js-loading {
         background-color: var(--color-panel-background);
 
@@ -73,6 +84,29 @@ main {
     }
 }
 
+/* Resize handle */
+
+rkgk-resize-handle {
+    &[data-direction="vertical"] {
+        display: block;
+        width: 16px;
+        height: 100%;
+
+        cursor: col-resize;
+
+        &>.visual {
+            width: 2px;
+            height: 100%;
+            background-color: var(--color-brand-blue);
+            margin: 0 auto;
+            opacity: 0%;
+        }
+
+        &:hover>.visual, &.dragging>.visual {
+            opacity: 100%;
+        }
+    }
+}
 
 /* Canvas renderer */
 

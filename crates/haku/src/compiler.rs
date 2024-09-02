@@ -34,6 +34,7 @@ enum Variable {
 struct Scope<'a> {
     locals: Vec<Local<'a>>,
     captures: Vec<Variable>,
+    let_count: usize,
 }
 
 pub struct Compiler<'a> {
@@ -57,6 +58,7 @@ impl<'a> Compiler<'a> {
             scopes: Vec::from_iter([Scope {
                 locals: Vec::new(),
                 captures: Vec::new(),
+                let_count: 0,
             }]),
         }
     }
@@ -472,6 +474,7 @@ fn compile_let<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -> C
     } else {
         let index = scope.locals.len();
         scope.locals.push(Local { name });
+        scope.let_count += 1;
         index as u8
     };
     c.chunk.emit_opcode(Opcode::SetLocal)?;
@@ -514,6 +517,7 @@ fn compile_lambda<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -
     c.scopes.push(Scope {
         locals,
         captures: Vec::new(),
+        let_count: 0,
     });
     compile_expr(c, src, body)?;
     c.chunk.emit_opcode(Opcode::Return)?;
@@ -522,7 +526,7 @@ fn compile_lambda<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -
     c.chunk.patch_u16(after_offset, after);
 
     let scope = c.scopes.pop().unwrap();
-    let local_count = u8::try_from(scope.locals.len()).unwrap_or_else(|_| {
+    let let_count = u8::try_from(scope.let_count).unwrap_or_else(|_| {
         c.emit(Diagnostic::error(
             src.ast.span(body),
             "function contains too many local variables",
@@ -536,7 +540,7 @@ fn compile_lambda<'a>(c: &mut Compiler<'a>, src: &Source<'a>, node_id: NodeId) -
         ));
         0
     });
-    c.chunk.emit_u8(local_count)?;
+    c.chunk.emit_u8(let_count)?;
     c.chunk.emit_u8(capture_count)?;
     for capture in scope.captures {
         match capture {

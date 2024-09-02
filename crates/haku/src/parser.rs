@@ -1,6 +1,7 @@
 use core::{cell::Cell, error::Error, fmt};
 
 use alloc::vec::Vec;
+use log::{error, info};
 
 use crate::{
     ast::{Ast, NodeAllocError, NodeId, NodeKind},
@@ -157,6 +158,7 @@ impl<'a> Parser<'a> {
     pub fn into_ast(self, ast: &mut Ast) -> Result<(NodeId, Vec<Diagnostic>), IntoAstError> {
         // If events are at capacity, that means the pool was exhausted and we return an error.
         if self.events.len() == self.events.capacity() {
+            error!("parser is at capacity");
             return Err(IntoAstError::TooManyEvents);
         }
 
@@ -171,13 +173,16 @@ impl<'a> Parser<'a> {
         }
 
         // Remove the last Close to keep a single node on the stack.
-        assert!(matches!(
+        if !matches!(
             events.pop(),
             Some(Event {
                 kind: EventKind::Close,
                 ..
             })
-        ));
+        ) {
+            error!("parser should have produced a Close event, but didn't");
+            return Err(IntoAstError::UnbalancedEvents);
+        }
 
         for event in events {
             match event.kind {
@@ -209,6 +214,7 @@ impl<'a> Parser<'a> {
 
         if stack.len() != 1 {
             // This means we had too many events emitted and they are no longer balanced.
+            error!("parser produced an unbalanced amount of events");
             return Err(IntoAstError::UnbalancedEvents);
         }
         // assert_eq!(token, self.tokens.len());

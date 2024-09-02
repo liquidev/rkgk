@@ -35,3 +35,4 @@ webp = "0.3.0"
 [features]
 default = []
 memory-profiling = ["dep:tracy-client"]
+haku-vm-trace = ["haku/vm-trace"]

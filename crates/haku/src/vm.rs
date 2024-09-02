@@ -5,13 +5,21 @@ use core::{
 };
 
 use alloc::{string::String, vec::Vec};
-use log::info;
 
 use crate::{
     bytecode::{self, Defs, Opcode, CAPTURE_CAPTURE, CAPTURE_LOCAL},
     system::{ChunkId, System},
     value::{BytecodeLoc, Closure, FunctionName, List, Ref, RefId, Rgba, Value, Vec4},
 };
+
+macro_rules! vmtrace {
+    ($($args:expr),* $(,)?) => {
+        #[cfg(feature = "vm-trace")]
+        {
+            log::info!($($args),*);
+        }
+    }
+}
 
 pub struct VmLimits {
     pub stack_capacity: usize,
@@ -129,6 +137,7 @@ impl Vm {
             ));
         }
         self.stack.push(value);
+        vmtrace!("push {:?}", self.stack);
         Ok(())
     }
 
@@ -147,9 +156,12 @@ impl Vm {
     }
 
     fn pop(&mut self) -> Result<Value, Exception> {
-        self.stack
+        let value = self
+            .stack
             .pop()
-            .ok_or_else(|| self.create_exception("corrupted bytecode (value stack underflow)"))
+            .ok_or_else(|| self.create_exception("corrupted bytecode (value stack underflow)"))?;
+        vmtrace!("pop  {:?} -> {:?}", self.stack, value);
+        Ok(value)
     }
 
     fn push_call(&mut self, frame: CallFrame) -> Result<(), Exception> {
@@ -198,7 +210,9 @@ impl Vm {
                 .checked_sub(1)
                 .ok_or_else(|| self.create_exception("code ran for too long"))?;
 
+            let pc2 = pc;
             let opcode = chunk.read_opcode(&mut pc)?;
+            vmtrace!("{pc2:2} {opcode:?}");
             match opcode {
                 Opcode::Nil => self.push(Value::Nil)?,
                 Opcode::False => self.push(Value::False)?,
@@ -301,7 +315,7 @@ impl Vm {
                         })
                     }
 
-                    let id = self.create_ref(Ref::Closure(Closure {
+                    let closure = Closure {
                         start: BytecodeLoc {
                             chunk_id,
                             offset: body as u16,
@@ -310,7 +324,9 @@ impl Vm {
                         param_count,
                         local_count,
                         captures,
-                    }))?;
+                    };
+                    vmtrace!("{closure:?}");
+                    let id = self.create_ref(Ref::Closure(closure))?;
                     self.push(Value::Ref(id))?;
                 }
 

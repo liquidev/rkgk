@@ -52,7 +52,9 @@ impl<'a> Parser<'a> {
 
         Self {
             tokens: input,
-            events: Vec::with_capacity(limits.max_events),
+            // Add one event to the capacity, because that makes it easier to detect when we ran out
+            // of space. (No need to store flags or anything, just check if events are at capacity.)
+            events: Vec::with_capacity(limits.max_events + 1),
             position: 0,
             diagnostics: Vec::with_capacity(16),
             fuel: Cell::new(Self::FUEL),
@@ -153,6 +155,11 @@ impl<'a> Parser<'a> {
     }
 
     pub fn into_ast(self, ast: &mut Ast) -> Result<(NodeId, Vec<Diagnostic>), IntoAstError> {
+        // If events are at capacity, that means the pool was exhausted and we return an error.
+        if self.events.len() == self.events.capacity() {
+            return Err(IntoAstError::TooManyEvents);
+        }
+
         let mut token = 0;
         let mut events = self.events;
         let mut stack = Vec::new();
@@ -260,6 +267,7 @@ impl fmt::Debug for Event {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntoAstError {
     NodeAlloc(NodeAllocError),
+    TooManyEvents,
     UnbalancedEvents,
 }
 
@@ -273,6 +281,7 @@ impl fmt::Display for IntoAstError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             IntoAstError::NodeAlloc(e) => fmt::Display::fmt(e, f),
+            IntoAstError::TooManyEvents => f.write_str("too many parser events"),
             IntoAstError::UnbalancedEvents => f.write_str("parser produced unbalanced events"),
         }
     }

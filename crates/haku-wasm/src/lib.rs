@@ -220,6 +220,7 @@ enum StatusCode {
     SourceCodeTooLong,
     TooManyTokens,
     TooManyAstNodes,
+    TooManyParserEvents,
     ParserUnbalancedEvents,
     ChunkTooBig,
     DiagnosticsEmitted,
@@ -254,6 +255,7 @@ extern "C" fn haku_status_string(code: StatusCode) -> *const i8 {
         StatusCode::SourceCodeTooLong => c"source code is too long",
         StatusCode::TooManyTokens => c"source code has too many tokens",
         StatusCode::TooManyAstNodes => c"source code has too many AST nodes",
+        StatusCode::TooManyParserEvents => c"source code has too many parser events",
         StatusCode::ParserUnbalancedEvents => c"parser produced unbalanced events",
         StatusCode::ChunkTooBig => c"compiled bytecode is too large",
         StatusCode::DiagnosticsEmitted => c"diagnostics were emitted",
@@ -364,6 +366,10 @@ unsafe extern "C" fn haku_compile_brush(
         Err(IntoAstError::NodeAlloc(_)) => {
             info!("compiling failed: too many AST nodes");
             return StatusCode::TooManyAstNodes;
+        }
+        Err(IntoAstError::TooManyEvents) => {
+            info!("compiling failed: too many parser events");
+            return StatusCode::TooManyParserEvents;
         }
         Err(IntoAstError::UnbalancedEvents) => {
             info!("compiling failed: parser produced unbalanced events");

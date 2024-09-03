@@ -9,11 +9,6 @@ export class Viewport {
         return Math.pow(2, this.zoomLevel * 0.25);
     }
 
-    panAround(x, y) {
-        this.panX -= x / this.zoom;
-        this.panY -= y / this.zoom;
-    }
-
     zoomIn(delta) {
         this.zoomLevel += delta;
         this.zoomLevel = Math.max(-16, Math.min(20, this.zoomLevel));

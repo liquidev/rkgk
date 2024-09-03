@@ -394,12 +394,19 @@ class CanvasRenderer extends HTMLElement {
     async #panningBehaviour() {
         while (true) {
             let mouseDown = await listen([this, "mousedown"]);
+
+            let startingPanX = this.viewport.panX;
+            let startingPanY = this.viewport.panY;
+
             if (mouseDown.button == 1 || mouseDown.button == 2) {
                 mouseDown.preventDefault();
                 while (true) {
                     let event = await listen([window, "mousemove"], [window, "mouseup"]);
                     if (event.type == "mousemove") {
-                        this.viewport.panAround(event.movementX, event.movementY);
+                        let deltaX = mouseDown.clientX - event.clientX;
+                        let deltaY = mouseDown.clientY - event.clientY;
+                        this.viewport.panX = startingPanX + deltaX / this.viewport.zoom;
+                        this.viewport.panY = startingPanY + deltaY / this.viewport.zoom;
                         this.sendViewportUpdate();
                     } else if (event.type == "mouseup" && event.button == mouseDown.button) {
                         this.dispatchEvent(new Event(".viewportUpdateEnd"));

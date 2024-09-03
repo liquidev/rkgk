@@ -11,18 +11,23 @@ export class ResizeHandle extends HTMLElement {
         this.target = document.getElementById(this.targetId);
         this.targetProperty = this.getAttribute("data-target-property");
         this.initSize = parseInt(this.getAttribute("data-init-size"));
+        this.minSize = parseInt(this.getAttribute("data-min-size"));
 
-        this.size = parseInt(localStorage.getItem(this.#localStorageKey));
-        if (this.size != this.size) {
-            this.size = this.initSize;
-            this.#saveSize();
-        }
+        this.#setSize(parseInt(localStorage.getItem(this.#localStorageKey)));
+        this.#saveSize();
         this.#updateTargetProperty();
 
         this.visual = this.appendChild(document.createElement("div"));
         this.visual.classList.add("visual");
 
         this.#draggingBehaviour();
+    }
+
+    #setSize(newSize) {
+        if (newSize != newSize) {
+            this.size = this.initSize;
+        }
+        this.size = Math.max(this.minSize, newSize);
     }
 
     get #localStorageKey() {
@@ -48,7 +53,7 @@ export class ResizeHandle extends HTMLElement {
                     let event = await listen([window, "mousemove"], [window, "mouseup"]);
                     if (event.type == "mousemove") {
                         if (this.direction == "vertical") {
-                            this.size = startingSize + (mouseDown.clientX - event.clientX);
+                            this.#setSize(startingSize + (mouseDown.clientX - event.clientX));
                         }
                         this.#updateTargetProperty();
                     } else if (event.type == "mouseup") {

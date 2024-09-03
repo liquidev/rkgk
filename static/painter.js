@@ -22,6 +22,7 @@ export class Painter {
                 let x = Math.floor(-chunkX * wall.chunkSize + centerX);
                 let y = Math.floor(-chunkY * wall.chunkSize + centerY);
                 let chunk = wall.getOrCreateChunk(chunkX, chunkY);
+                chunk.markModified();
 
                 let renderResult = haku.renderValue(chunk.pixmap, x, y);
                 if (renderResult.status != "ok") {

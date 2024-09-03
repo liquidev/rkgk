@@ -100,16 +100,16 @@ export class Pixmap {
         return this.#pPixmap;
     }
 
-    get imageData() {
-        return new ImageData(
-            new Uint8ClampedArray(
-                memory.buffer,
-                w.haku_pixmap_data(this.#pPixmap),
-                this.width * this.height * 4,
-            ),
-            this.width,
-            this.height,
+    getArrayBuffer() {
+        return new Uint8ClampedArray(
+            memory.buffer,
+            w.haku_pixmap_data(this.#pPixmap),
+            this.width * this.height * 4,
         );
+    }
+
+    getImageData() {
+        return new ImageData(this.getArrayBuffer(), this.width, this.height);
     }
 }
 
@@ -119,6 +119,8 @@ export class Haku {
     #brushCode = null;
 
     constructor(limits) {
+        console.groupCollapsed("construct Haku");
+
         let pLimits = w.haku_limits_new();
         for (let name of Object.keys(limits)) {
             w[`haku_limits_set_${name}`](pLimits, limits[name]);
@@ -128,6 +130,8 @@ export class Haku {
         this.#pBrush = w.haku_brush_new();
 
         w.haku_limits_destroy(pLimits);
+
+        console.groupEnd();
     }
 
     destroy() {

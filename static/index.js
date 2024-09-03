@@ -211,6 +211,7 @@ function readUrl(urlString) {
                         chunk.ctx.globalCompositeOperation = "copy";
                         chunk.ctx.drawImage(bitmap, 0, 0);
                         chunk.syncToPixmap();
+                        chunk.markModified();
                     }),
                 );
             }

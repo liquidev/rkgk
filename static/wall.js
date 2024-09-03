@@ -6,15 +6,20 @@ export class Chunk {
         this.pixmap = new Pixmap(size, size);
         this.canvas = new OffscreenCanvas(size, size);
         this.ctx = this.canvas.getContext("2d");
+        this.renderDirty = false;
     }
 
     syncFromPixmap() {
-        this.ctx.putImageData(this.pixmap.imageData, 0, 0);
+        this.ctx.putImageData(this.pixmap.getImageData(), 0, 0);
     }
 
     syncToPixmap() {
         let imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        this.pixmap.imageData.data.set(imageData.data, 0);
+        this.pixmap.getImageData().data.set(imageData.data, 0);
+    }
+
+    markModified() {
+        this.renderDirty = true;
     }
 }
 

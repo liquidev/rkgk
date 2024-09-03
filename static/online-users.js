@@ -20,7 +20,7 @@ export class User {
     }
 
     setBrush(brush) {
-        console.group("setBrush", this.nickname);
+        console.groupCollapsed("setBrush", this.nickname);
         let compileResult = this.haku.setBrush(brush);
         console.log("compiling brush complete", compileResult);
         console.groupEnd();
@@ -31,7 +31,7 @@ export class User {
     }
 
     renderBrushToChunks(wall, x, y) {
-        console.group("renderBrushToChunks", this.nickname);
+        console.groupCollapsed("renderBrushToChunks", this.nickname);
         let result = this.painter.renderBrushToWall(this.haku, x, y, wall);
         console.log("rendering brush to chunks complete");
         console.groupEnd();

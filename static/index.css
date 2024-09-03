@@ -41,27 +41,23 @@ main {
 
         &>.right {
             grid-column: right / right;
-            height: 100%;
+            height: fit-content;
             min-height: 0;
             max-height: 100%;
 
-            &>.right-content {
-                max-height: 100%;
+            display: flex;
+            flex-direction: row;
+            justify-content: stretch;
 
-                display: flex;
-                flex-direction: row;
-                justify-content: stretch;
-                
-                &>rkgk-resize-handle {
-                    flex-shrink: 0;
-                    height: auto;
-                }
+            &>rkgk-resize-handle {
+                flex-shrink: 0;
+                height: auto;
+            }
 
-                &>rkgk-brush-editor {
-                    height: auto;
-                    overflow: auto;
-                    flex-grow: 1;
-                }
+            &>rkgk-brush-editor {
+                height: auto;
+                overflow: auto;
+                flex-grow: 1;
             }
         }
     }

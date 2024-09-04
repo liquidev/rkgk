@@ -25,7 +25,7 @@ export class ResizeHandle extends HTMLElement {
 
     #setSize(newSize) {
         if (newSize != newSize) {
-            this.size = this.initSize;
+            newSize = this.initSize;
         }
         this.size = Math.max(this.minSize, newSize);
     }

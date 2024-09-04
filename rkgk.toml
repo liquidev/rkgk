@@ -70,14 +70,14 @@ max_chunks = 2
 max_defs = 256
 
 # Maximum amount of tokens a single chunk can have.
-max_tokens = 4096
+max_tokens = 65536
 
 # Maximum amount of events that the parser may emit in a single chunk.
 # These don't take up that much memory (a byte per event), so having many of these isn't a big deal.
 max_parser_events = 65536
 
 # Maximum amount of AST nodes in a single parse.
-ast_capacity = 4096
+ast_capacity = 65536
 
 # Maximum size of a bytecode chunk.
 # This must be <= 65536 due to bytecode limitations - offsets are stored as 16-bit integers.

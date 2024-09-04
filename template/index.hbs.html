@@ -6,38 +6,47 @@
         
         <title>rakugaki</title>
 
-        <link rel="stylesheet" href="static/base.css">
-        <link rel="stylesheet" href="static/index.css">
+        <link rel="stylesheet" href="{{ static 'base.css' }}">
+        <link rel="stylesheet" href="{{ static 'fonts.css' }}">
+        <link rel="stylesheet" href="{{ static 'index.css' }}">
 
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        
-        <script src="static/live-reload.js" type="module"></script>
 
-        <script src="static/brush-editor.js" type="module"></script>
-        <script src="static/canvas-renderer.js" type="module"></script>
-        <script src="static/connection-status.js" type="module"></script>
-        <script src="static/framework.js" type="module"></script>
-        <script src="static/resize-handle.js" type="module"></script>
-        <script src="static/reticle-renderer.js" type="module"></script>
-        <script src="static/session.js" type="module"></script>
-        <script src="static/throbber.js" type="module"></script>
-        <script src="static/viewport.js" type="module"></script>
-        <script src="static/welcome.js" type="module"></script>        
-        
-        <script src="static/index.js" type="module" defer></script>
+        <script type="importmap">{{{ include_static 'import_map.json' }}}</script>
 
-        <link rel="icon" sizes="16x16" href="/static/favicon/rkgk@1x.png">
-        <link rel="icon" sizes="32x32" href="/static/favicon/rkgk@2x.png">
-        <link rel="icon" sizes="64x64" href="/static/favicon/rkgk@4x.png">
-        <link rel="icon" sizes="128x128" href="/static/favicon/rkgk@8x.png">
-        <link rel="icon" sizes="256x256" href="/static/favicon/rkgk@16x.png">
-        <link rel="icon" sizes="512x512" href="/static/favicon/rkgk@32x.png">
-        <link rel="apple-touch-icon" sizes="16x16" href="/static/favicon/rkgk@1x.png">
-        <link rel="apple-touch-icon" sizes="32x32" href="/static/favicon/rkgk@2x.png">
-        <link rel="apple-touch-icon" sizes="64x64" href="/static/favicon/rkgk@4x.png">
-        <link rel="apple-touch-icon" sizes="128x128" href="/static/favicon/rkgk@8x.png">
-        <link rel="apple-touch-icon" sizes="256x256" href="/static/favicon/rkgk@16x.png">
-        <link rel="apple-touch-icon" sizes="512x512" href="/static/favicon/rkgk@32x.png">
+        <script>
+            const HAKU_WASM_PATH = "{{{ static 'wasm/haku.wasm' }}}";
+        </script>
+        
+        <script type="module">
+            import "rkgk/live-reload.js";
+
+            import "rkgk/brush-editor.js";
+            import "rkgk/canvas-renderer.js";
+            import "rkgk/connection-status.js";
+            import "rkgk/framework.js";
+            import "rkgk/resize-handle.js";
+            import "rkgk/reticle-renderer.js";
+            import "rkgk/session.js";
+            import "rkgk/throbber.js";
+            import "rkgk/viewport.js";
+            import "rkgk/welcome.js";
+    
+            import "rkgk/index.js";
+        </script>
+
+        <link rel="icon" sizes="16x16" href="{{ static 'favicon/rkgk@1x.png' }}">
+        <link rel="icon" sizes="32x32" href="{{ static 'favicon/rkgk@2x.png' }}">
+        <link rel="icon" sizes="64x64" href="{{ static 'favicon/rkgk@4x.png' }}">
+        <link rel="icon" sizes="128x128" href="{{ static 'favicon/rkgk@8x.png' }}">
+        <link rel="icon" sizes="256x256" href="{{ static 'favicon/rkgk@16x.png' }}">
+        <link rel="icon" sizes="512x512" href="{{ static 'favicon/rkgk@32x.png' }}">
+        <link rel="apple-touch-icon" sizes="16x16" href="{{ static 'favicon/rkgk@1x.png' }}">
+        <link rel="apple-touch-icon" sizes="32x32" href="{{ static 'favicon/rkgk@2x.png' }}">
+        <link rel="apple-touch-icon" sizes="64x64" href="{{ static 'favicon/rkgk@4x.png' }}">
+        <link rel="apple-touch-icon" sizes="128x128" href="{{ static 'favicon/rkgk@8x.png' }}">
+        <link rel="apple-touch-icon" sizes="256x256" href="{{ static 'favicon/rkgk@16x.png' }}">
+        <link rel="apple-touch-icon" sizes="512x512" href="{{ static 'favicon/rkgk@32x.png' }}">
     </head>
 
     <body>
@@ -133,3 +142,4 @@
         </main>
     </body>
 </html>
+

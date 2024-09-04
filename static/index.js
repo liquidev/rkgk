@@ -1,4 +1,4 @@
-import { Wall } from "./wall.js";
+import { Wall } from "rkgk/wall.js";
 import {
     getLoginSecret,
     getUserId,
@@ -6,9 +6,9 @@ import {
     newSession,
     registerUser,
     waitForLogin,
-} from "./session.js";
-import { debounce } from "./framework.js";
-import { ReticleCursor } from "./reticle-renderer.js";
+} from "rkgk/session.js";
+import { debounce } from "rkgk/framework.js";
+import { ReticleCursor } from "rkgk/reticle-renderer.js";
 
 const updateInterval = 1000 / 60;
 

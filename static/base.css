@@ -23,50 +23,6 @@ body {
 
 /* Fonts */
 
-@font-face {
-    font-family: "Atkinson Hyperlegible";
-    src:
-        local("Atkinson Hyperlegible Regular"),
-        url("font/AtkinsonHyperlegible-Regular.ttf");
-    font-weight: 400;
-}
-
-@font-face {
-    font-family: "Atkinson Hyperlegible";
-    src:
-        local("Atkinson Hyperlegible Italic"),
-        url("font/AtkinsonHyperlegible-Italic.ttf");
-    font-weight: 400;
-    font-style: italic;
-}
-
-@font-face {
-    font-family: "Atkinson Hyperlegible";
-    src:
-        local("Atkinson Hyperlegible Bold"),
-        url("font/AtkinsonHyperlegible-Bold.ttf");
-    font-weight: 700;
-}
-
-@font-face {
-    font-family: "Atkinson Hyperlegible";
-    src:
-        local("Atkinson Hyperlegible Bold Italic"),
-        url("font/AtkinsonHyperlegible-BoldItalic.ttf");
-    font-weight: 700;
-    font-style: italic;
-}
-
-@font-face {
-    /* NOTE: This is my own variant of Iosevka that more or less follows the stylistic choices
-       of Atkinson Hyperlegible. */
-    font-family: "Iosevka Hyperlegible";
-    src:
-        local("Iosevka Hyperlegible"),
-        url("font/IosevkaHyperlegible-Regular.woff2");
-    font-weight: 400;
-}
-
 :root {
     font-family: "Atkinson Hyperlegible", sans-serif;
 }

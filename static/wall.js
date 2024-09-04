@@ -1,5 +1,5 @@
-import { Pixmap } from "./haku.js";
-import { OnlineUsers } from "./online-users.js";
+import { Pixmap } from "rkgk/haku.js";
+import { OnlineUsers } from "rkgk/online-users.js";
 
 export class Chunk {
     constructor(size) {

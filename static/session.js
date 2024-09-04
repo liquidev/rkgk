@@ -1,4 +1,4 @@
-import { listen } from "./framework.js";
+import { listen } from "rkgk/framework.js";
 
 let loginStorage = JSON.parse(localStorage.getItem("rkgk.login") ?? "{}");
 

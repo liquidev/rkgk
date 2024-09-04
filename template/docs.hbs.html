@@ -4,12 +4,13 @@
     <head>
         <meta charset="UTF-8">
         <title>{{ title }} · rakugaki manual</title>
-        <link rel="stylesheet" href="/static/base.css">
-        <link rel="stylesheet" href="/static/docs.css">
+        <link rel="stylesheet" href="{{ static 'base.css' }}">
+        <link rel="stylesheet" href="{{ static 'fonts.css' }}">
+        <link rel="stylesheet" href="{{ static 'docs.css' }}">
 
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <script src="/static/live-reload.js" type="module"></script>
+        <script src="{{ static 'live-reload.js' }}" type="module"></script>
 
         <link rel="icon" sizes="16x16" href="/static/favicon/rkgk@1x.png">
         <link rel="icon" sizes="32x32" href="/static/favicon/rkgk@2x.png">

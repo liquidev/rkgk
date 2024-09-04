@@ -4,7 +4,15 @@
 
 # List of Handlebars templates to render.
 render_templates = [
-    { template = "docs.hbs.html", from_dir = "docs", to_dir = "docs" }
+    { template = "fonts.hbs.css", to_file = "static/fonts.css" },
+
+    { template = "index.hbs.html", to_file = "static/index.html" },
+    { template = "docs.hbs.html", from_dir = "docs", to_dir = "docs" },
+]
+
+# List of JavaScript `import` root directories.
+import_roots = [
+    { name = "rkgk", path = "static" },
 ]
 
 [build.page_titles]

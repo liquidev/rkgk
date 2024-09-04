@@ -1,6 +1,6 @@
-import { listen } from "./framework.js";
-import { Viewport } from "./viewport.js";
-import { Wall } from "./wall.js";
+import { listen } from "rkgk/framework.js";
+import { Viewport } from "rkgk/viewport.js";
+import { Wall } from "rkgk/wall.js";
 
 class CanvasRenderer extends HTMLElement {
     viewport = new Viewport();

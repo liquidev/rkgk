@@ -1,5 +1,5 @@
-import { Haku } from "./haku.js";
-import { Painter } from "./painter.js";
+import { Haku } from "rkgk/haku.js";
+import { Painter } from "rkgk/painter.js";
 
 export class User {
     nickname = "";

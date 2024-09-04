@@ -1,4 +1,4 @@
-import { listen } from "./framework.js";
+import { listen } from "rkgk/framework.js";
 
 export class ResizeHandle extends HTMLElement {
     constructor() {

@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::wall;
+use crate::{build::import_map::ImportRoot, wall};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -15,6 +15,7 @@ pub struct Config {
 pub struct BuildConfig {
     pub render_templates: Vec<RenderTemplate>,
     pub page_titles: HashMap<PathBuf, String>,
+    pub import_roots: Vec<ImportRoot>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -27,5 +28,6 @@ pub struct RenderTemplate {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum RenderTemplateFiles {
+    SingleFile { to_file: PathBuf },
     Directory { from_dir: PathBuf, to_dir: PathBuf },
 }

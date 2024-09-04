@@ -8,7 +8,7 @@ function makeLogFunction(level) {
 }
 
 let { instance: hakuInstance, module: hakuModule } = await WebAssembly.instantiateStreaming(
-    fetch(import.meta.resolve("./wasm/haku.wasm")),
+    fetch(HAKU_WASM_PATH),
     {
         env: {
             panic(length, pMessage) {

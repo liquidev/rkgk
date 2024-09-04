@@ -4,7 +4,6 @@ use core::{
 };
 
 use alloc::vec::Vec;
-use log::info;
 
 use crate::{
     ast::{Ast, NodeId, NodeKind},

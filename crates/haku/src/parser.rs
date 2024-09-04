@@ -37,6 +37,9 @@ enum EventKind {
     Advance,
 }
 
+// We don't want events taking up too much memory all of a sudden.
+const _: () = assert!(size_of::<EventKind>() == 1);
+
 struct Open {
     index: Option<usize>,
 }

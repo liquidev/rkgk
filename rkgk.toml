@@ -73,7 +73,8 @@ max_defs = 256
 max_tokens = 4096
 
 # Maximum amount of events that the parser may emit in a single chunk.
-max_parser_events = 4096
+# These don't take up that much memory (a byte per event), so having many of these isn't a big deal.
+max_parser_events = 65536
 
 # Maximum amount of AST nodes in a single parse.
 ast_capacity = 4096

@@ -65,9 +65,23 @@ class CanvasRenderer extends HTMLElement {
     #initializeRenderer() {
         console.groupCollapsed("initializeRenderer");
 
+        console.info("vendor", this.gl.getParameter(this.gl.VENDOR));
+        console.info("renderer", this.gl.getParameter(this.gl.RENDERER));
+
         this.gl.enable(this.gl.BLEND);
         this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
 
+        // Due to an ANGLE bug on Windows, we can only render around 64 rectangles in a batch.
+        //
+        // It seems that for DirectX it generates a horribly inefficient shader that the DirectX
+        // compiler takes _ages_ to process (~1.5min on my machine for 512 elements.)
+        // The compilation time seems to increase exponentially; 256 elements take around 8 seconds,
+        // which is still unacceptable, and 128 elements take just over a second.
+        //
+        // We choose 64 because it causes an extremely short stutter, which I find acceptable.
+        // We also realistically don't need anymore, because (at least at the time I'm writing this)
+        // we store (8 * 8 = 64) chunks per texture atlas, so we can't batch more than that.
+        const maxRects = 64;
         let renderChunksProgramId = this.#compileProgram(
             // Vertex
             `#version 300 es
@@ -79,33 +93,19 @@ class CanvasRenderer extends HTMLElement {
                 vec4 uv;
             };
 
-            layout (std140) uniform ub_rects { Rect u_rects[512]; };
+            layout (std140) uniform ub_rects { Rect u_rects[${maxRects}]; };
 
-            uniform vec2 u_screenSize;
-            uniform vec2 u_translation;
-            uniform vec2 u_scale;
+            uniform mat4 u_projection;
+            uniform mat4 u_view;
 
             layout (location = 0) in vec2 a_position;
             out vec2 vf_uv;
 
             void main() {
-                mat4 matProjection = mat4(
-                    2.0 / u_screenSize.x, 0.0,                   0.0, 0.0,
-                    0.0,                  2.0 / -u_screenSize.y, 0.0, 0.0,
-                    0.0,                  0.0,                   1.0, 0.0,
-                    -1.0,                 1.0,                   0.0, 1.0
-                );
-                mat4 matModel = mat4(
-                    u_scale.x,       0.0,             0.0, 0.0,
-                    0.0,             u_scale.y,       0.0, 0.0,
-                    0.0,             0.0,             1.0, 0.0,
-                    u_translation.x, u_translation.y, 0.0, 1.0
-                );
-
                 Rect rect = u_rects[gl_InstanceID];
                 vec2 localPosition = rect.position.xy + a_position * rect.position.zw;
-                vec4 screenPosition = floor(matModel * vec4(localPosition, 0.0, 1.0));
-                vec4 scenePosition = matProjection * screenPosition;
+                vec4 screenPosition = floor(u_view * vec4(localPosition, 0.0, 1.0));
+                vec4 scenePosition = u_projection * screenPosition;
 
                 vec2 uv = rect.uv.xy + a_position * rect.uv.zw;
 
@@ -133,9 +133,8 @@ class CanvasRenderer extends HTMLElement {
         this.renderChunksProgram = {
             id: renderChunksProgramId,
 
-            u_screenSize: this.gl.getUniformLocation(renderChunksProgramId, "u_screenSize"),
-            u_translation: this.gl.getUniformLocation(renderChunksProgramId, "u_translation"),
-            u_scale: this.gl.getUniformLocation(renderChunksProgramId, "u_scale"),
+            u_projection: this.gl.getUniformLocation(renderChunksProgramId, "u_projection"),
+            u_view: this.gl.getUniformLocation(renderChunksProgramId, "u_view"),
             u_texture: this.gl.getUniformLocation(renderChunksProgramId, "u_texture"),
             ub_rects: this.gl.getUniformBlockIndex(renderChunksProgramId, "ub_rects"),
         };
@@ -162,7 +161,7 @@ class CanvasRenderer extends HTMLElement {
         this.gl.vertexAttribPointer(0, 2, this.gl.FLOAT, false, 2 * 4, 0);
         this.gl.enableVertexAttribArray(0);
 
-        this.uboRectsData = new Float32Array(new ArrayBuffer(16384));
+        this.uboRectsData = new Float32Array(maxRects * 8);
         this.uboRectsNum = 0;
 
         this.uboRects = this.gl.createBuffer();
@@ -251,18 +250,32 @@ class CanvasRenderer extends HTMLElement {
 
         this.gl.useProgram(this.renderChunksProgram.id);
 
-        this.gl.uniform2f(
-            this.renderChunksProgram.u_screenSize,
-            this.canvas.width,
-            this.canvas.height,
-        );
+        let translationX = this.canvas.width / 2 - this.viewport.panX * this.viewport.zoom;
+        let translationY = this.canvas.height / 2 - this.viewport.panY * this.viewport.zoom;
+        let scale = this.viewport.zoom;
 
-        this.gl.uniform2f(
-            this.renderChunksProgram.u_translation,
-            this.canvas.width / 2 - this.viewport.panX * this.viewport.zoom,
-            this.canvas.height / 2 - this.viewport.panY * this.viewport.zoom,
+        this.gl.uniformMatrix4fv(
+            this.renderChunksProgram.u_projection,
+            false,
+            // prettier-ignore
+            [
+                2.0 / this.canvas.width, 0.0,                       0.0, 0.0,
+                0.0,                     2.0 / -this.canvas.height, 0.0, 0.0,
+                0.0,                     0.0,                       1.0, 0.0,
+                -1.0,                    1.0,                       0.0, 1.0
+            ],
         );
-        this.gl.uniform2f(this.renderChunksProgram.u_scale, this.viewport.zoom, this.viewport.zoom);
+        this.gl.uniformMatrix4fv(
+            this.renderChunksProgram.u_view,
+            false,
+            // prettier-ignore
+            [
+                scale,        0.0,          0.0, 0.0,
+                0.0,          scale,        0.0, 0.0,
+                0.0,          0.0,          1.0, 0.0,
+                translationX, translationY, 0.0, 1.0
+            ],
+        );
 
         this.#collectChunksThisFrame();
 

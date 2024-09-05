@@ -19,6 +19,8 @@ export class BrushEditor extends HTMLElement {
         this.codeEditor = this.appendChild(new CodeEditor());
         this.codeEditor.setCode(localStorage.getItem("rkgk.brushEditor.code") ?? defaultBrush);
         this.codeEditor.addEventListener(".codeChanged", (event) => {
+            localStorage.setItem("rkgk.brushEditor.code", event.newCode);
+
             this.dispatchEvent(
                 Object.assign(new Event(".codeChanged"), {
                     newCode: event.newCode,

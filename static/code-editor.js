@@ -6,6 +6,9 @@ export class CodeEditor extends HTMLElement {
     connectedCallback() {
         this.indentWidth = 2;
 
+        this.layerGutter = this.appendChild(document.createElement("pre"));
+        this.layerGutter.classList.add("layer", "layer-gutter");
+
         this.textArea = this.appendChild(document.createElement("textarea"));
         this.textArea.spellcheck = false;
         this.textArea.rows = 1;
@@ -29,13 +32,17 @@ export class CodeEditor extends HTMLElement {
 
         this.#textAreaAutoSizingBehaviour();
         this.#keyShortcutBehaviours();
+
+        this.#renderLayers();
     }
 
     get code() {
         return this.textArea.value;
     }
 
-    #sendCodeChanged() {
+    #codeChanged() {
+        this.#resizeTextArea();
+        this.#renderLayers();
         this.dispatchEvent(
             Object.assign(new Event(".codeChanged"), {
                 newCode: this.code,
@@ -45,14 +52,14 @@ export class CodeEditor extends HTMLElement {
 
     setCode(value) {
         this.textArea.value = value;
-        this.#resizeTextArea();
-        this.#sendCodeChanged();
+        this.#codeChanged();
     }
+
+    // Resizing the text area
 
     #textAreaAutoSizingBehaviour() {
         this.textArea.addEventListener("input", () => {
-            this.#resizeTextArea();
-            this.#sendCodeChanged();
+            this.#codeChanged();
         });
         this.#resizeTextArea();
         document.fonts.addEventListener("loadingdone", () => this.#resizeTextArea());
@@ -83,6 +90,24 @@ export class CodeEditor extends HTMLElement {
         this.textArea.style.height = "";
         this.textArea.style.height = `${this.textArea.scrollHeight}px`;
     }
+
+    // Layers
+
+    #renderLayers() {
+        this.#renderGutter();
+    }
+
+    #renderGutter() {
+        this.layerGutter.replaceChildren();
+
+        for (let line of this.code.split("\n")) {
+            let lineElement = this.layerGutter.appendChild(document.createElement("span"));
+            lineElement.classList.add("line");
+            lineElement.textContent = line;
+        }
+    }
+
+    // Text editing
 
     #keyShortcutBehaviours() {
         this.textArea.addEventListener("keydown", (event) => {

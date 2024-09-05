@@ -11,6 +11,9 @@
     --color-shaded-background: rgba(0, 0, 0, 5%);
 
     --dialog-backdrop: rgba(255, 255, 255, 0.5);
+
+    --font-body: "Atkinson Hyperlegible", sans-serif;
+    --font-monospace: "Iosevka Hyperlegible", monospace;
 }
 
 /* Reset */ 
@@ -24,7 +27,7 @@ body {
 /* Fonts */
 
 :root {
-    font-family: "Atkinson Hyperlegible", sans-serif;
+    font-family: var(--font-body);
 }
 
 button, textarea, input {
@@ -33,7 +36,7 @@ button, textarea, input {
 }
 
 pre, code, textarea {
-    font-family: "Iosevka Hyperlegible", monospace;
+    font-family: var(--font-monospace);
     line-height: 1.5;
 }
 

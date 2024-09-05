@@ -169,7 +169,7 @@ rkgk-reticle-cursor {
 /* Code editor */
 
 rkgk-code-editor {
-    --gutter-width: 2.5em;
+    --gutter-width: 2.75em;
 
     display: block;
     position: relative;
@@ -191,6 +191,7 @@ rkgk-code-editor {
         flex-direction: column;
 
         &>.line {
+            flex-shrink: 0;
             white-space: pre-wrap;
         }
     }
@@ -209,10 +210,11 @@ rkgk-code-editor {
             counter-increment: line;
 
             &::before {
+                flex-shrink: 0;
+
                 display: block;
                 width: var(--gutter-width);
-                flex-shrink: 0;
-                padding-right: 0.5em;
+                padding-right: 0.75em;
                 box-sizing: border-box;
 
                 content: counter(line);

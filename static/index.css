@@ -166,6 +166,21 @@ rkgk-reticle-cursor {
     }
 }
 
+/* Code editor */
+
+rkgk-code-editor {
+    &>textarea {
+        display: block;
+        width: 100%;
+        margin: 0;
+        resize: none;
+        white-space: pre-wrap;
+        border: none;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+}
+
 /* Brush editor */
 
 rkgk-brush-editor {

@@ -1,3 +1,5 @@
+import { CodeEditor } from "rkgk/code-editor.js";
+
 const defaultBrush = `
 -- This is your brush.
 -- Try playing around with the numbers,
@@ -14,24 +16,15 @@ export class BrushEditor extends HTMLElement {
     connectedCallback() {
         this.classList.add("rkgk-panel");
 
-        this.textArea = this.appendChild(document.createElement("textarea"));
-        this.textArea.classList.add("text-area");
-        this.textArea.value = localStorage.getItem("rkgk.brushEditor.code") ?? defaultBrush;
-        this.textArea.spellcheck = false;
-        this.textArea.rows = 1;
-        this.textArea.addEventListener("input", () => {
-            this.#resizeTextArea();
-
-            localStorage.setItem("rkgk.brushEditor.code", this.code);
+        this.codeEditor = this.appendChild(new CodeEditor());
+        this.codeEditor.setCode(localStorage.getItem("rkgk.brushEditor.code") ?? defaultBrush);
+        this.codeEditor.addEventListener(".codeChanged", (event) => {
             this.dispatchEvent(
                 Object.assign(new Event(".codeChanged"), {
-                    newCode: this.code,
+                    newCode: event.newCode,
                 }),
             );
         });
-        requestAnimationFrame(() => this.#resizeTextArea());
-        document.fonts.addEventListener("loadingdone", () => this.#resizeTextArea());
-        new ResizeObserver(() => this.#resizeTextArea()).observe(this);
 
         this.errorHeader = this.appendChild(document.createElement("h1"));
         this.errorHeader.classList.add("error-header");
@@ -40,13 +33,8 @@ export class BrushEditor extends HTMLElement {
         this.errorArea.classList.add("errors");
     }
 
-    #resizeTextArea() {
-        this.textArea.style.height = "";
-        this.textArea.style.height = `${this.textArea.scrollHeight}px`;
-    }
-
     get code() {
-        return this.textArea.value;
+        return this.codeEditor.code;
     }
 
     resetErrors() {

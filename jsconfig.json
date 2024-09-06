@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "baseUrl": "./static",
+        "paths": {
+            "rkgk/*": [
+                "./*"
+            ]
+        },
+        "target": "ES2020"
+    }
+}

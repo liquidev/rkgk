@@ -431,14 +431,16 @@ class CanvasRenderer extends HTMLElement {
     }
 
     async #zoomingBehaviour() {
-        while (true) {
-            let event = await listen([this, "wheel"]);
-
-            // TODO: Touchpad zoom
-            this.viewport.zoomIn(event.deltaY > 0 ? -1 : 1);
-            this.sendViewportUpdate();
-            this.dispatchEvent(new Event(".viewportUpdateEnd"));
-        }
+        this.addEventListener(
+            "wheel",
+            (event) => {
+                // TODO: Touchpad zoom
+                this.viewport.zoomIn(event.deltaY > 0 ? -1 : 1);
+                this.sendViewportUpdate();
+                this.dispatchEvent(new Event(".viewportUpdateEnd"));
+            },
+            { bubbling: false },
+        );
     }
 
     async #paintingBehaviour() {

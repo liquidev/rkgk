@@ -1,6 +1,8 @@
 export class CodeEditor extends HTMLElement {
-    constructor() {
+    constructor(layers) {
         super();
+
+        this.layers = layers;
     }
 
     connectedCallback() {
@@ -8,6 +10,16 @@ export class CodeEditor extends HTMLElement {
 
         this.layerGutter = this.appendChild(document.createElement("pre"));
         this.layerGutter.classList.add("layer", "layer-gutter");
+
+        this.userLayers = [];
+        for (let layer of this.layers) {
+            let element = this.appendChild(document.createElement("pre"));
+            element.classList.add("layer", layer.className);
+            this.userLayers.push({
+                def: layer,
+                element,
+            });
+        }
 
         this.textArea = this.appendChild(document.createElement("textarea"));
         this.textArea.spellcheck = false;
@@ -66,26 +78,6 @@ export class CodeEditor extends HTMLElement {
         new ResizeObserver(() => this.#resizeTextArea()).observe(this.textArea);
     }
 
-    getSelection() {
-        // NOTE: We only support one selection, because multiple selections are only
-        // supported by Firefox.
-
-        if (document.activeElement != this.textArea) return null;
-
-        if (this.textArea.selectionDirection == "forward") {
-            return new Selection(this.textArea.selectionStart, this.textArea.selectionEnd);
-        } else {
-            return new Selection(this.textArea.selectionEnd, this.textArea.selectionStart);
-        }
-    }
-
-    setSelection(selection) {
-        this.textArea.selectionDirection =
-            selection.anchor < selection.cursor ? "forward" : "backward";
-        this.textArea.selectionStart = selection.start;
-        this.textArea.selectionEnd = selection.end;
-    }
-
     #resizeTextArea() {
         this.textArea.style.height = "";
         this.textArea.style.height = `${this.textArea.scrollHeight}px`;
@@ -93,17 +85,36 @@ export class CodeEditor extends HTMLElement {
 
     // Layers
 
+    rebuildLineMap() {
+        this.lineMap = new LineMap(this.code);
+    }
+
     #renderLayers() {
+        this.rebuildLineMap();
+
         this.#renderGutter();
+        for (let userLayer of this.userLayers) {
+            userLayer.element.replaceChildren();
+            userLayer.def.render(this.lineMap, userLayer.element);
+        }
     }
 
     #renderGutter() {
         this.layerGutter.replaceChildren();
 
-        for (let line of this.code.split("\n")) {
+        for (let lineBounds of this.lineMap.lineBounds) {
             let lineElement = this.layerGutter.appendChild(document.createElement("span"));
             lineElement.classList.add("line");
-            lineElement.textContent = line;
+            lineElement.textContent = lineBounds.substring;
+        }
+    }
+
+    renderLayer(className) {
+        for (let userLayer of this.userLayers) {
+            if (userLayer.def.className == className) {
+                userLayer.element.replaceChildren();
+                userLayer.def.render(this.lineMap, userLayer.element);
+            }
         }
     }
 
@@ -129,6 +140,26 @@ export class CodeEditor extends HTMLElement {
         this.textArea.addEventListener("beforeinput", () => {
             this.pushHistory({ allowMerge: true });
         });
+    }
+
+    getSelection() {
+        // NOTE: We only support one selection, because multiple selections are only
+        // supported by Firefox.
+
+        if (document.activeElement != this.textArea) return null;
+
+        if (this.textArea.selectionDirection == "forward") {
+            return new Selection(this.textArea.selectionStart, this.textArea.selectionEnd);
+        } else {
+            return new Selection(this.textArea.selectionEnd, this.textArea.selectionStart);
+        }
+    }
+
+    setSelection(selection) {
+        this.textArea.selectionDirection =
+            selection.anchor < selection.cursor ? "forward" : "backward";
+        this.textArea.selectionStart = selection.start;
+        this.textArea.selectionEnd = selection.end;
     }
 
     replace(selection, text) {
@@ -286,7 +317,7 @@ export class CodeEditor extends HTMLElement {
 
 customElements.define("rkgk-code-editor", CodeEditor);
 
-class Selection {
+export class Selection {
     constructor(anchor, cursor) {
         this.anchor = anchor;
         this.cursor = cursor;
@@ -317,7 +348,7 @@ class Selection {
     }
 }
 
-function getLineStart(string, position) {
+export function getLineStart(string, position) {
     do {
         --position;
     } while (string.charAt(position) != "\n" && position > 0);
@@ -325,20 +356,70 @@ function getLineStart(string, position) {
     return position;
 }
 
-function getLineEnd(string, position) {
+export function getLineEnd(string, position) {
     while (string.charAt(position) != "\n" && position < string.length) ++position;
     return position + 1;
 }
 
-function getPositionInLine(string, position) {
+export function getPositionInLine(string, position) {
     return position - getLineStart(string, position);
 }
 
-function countSpaces(string, position) {
+export function countSpaces(string, position) {
     let count = 0;
     while (string.charAt(position) == " ") {
         ++count;
         ++position;
     }
     return count;
+}
+
+export class LineMap {
+    constructor(string) {
+        // This simplifies the algorithm below a bit.
+        string += "\n";
+
+        this.string = string;
+        this.lineBounds = [];
+
+        let start = 0;
+        for (let i = 0; i < string.length; ++i) {
+            if (string.charAt(i) == "\n") {
+                let substring = string.substring(start, i);
+                this.lineBounds.push({ start, end: i, substring });
+                start = i + 1;
+            }
+        }
+        if (start < string.length) {
+            this.lineBounds.push({ start, end: string.length, substring: string.substring(start) });
+        }
+    }
+
+    get(lineIndex) {
+        return this.lineBounds[lineIndex];
+    }
+
+    lineIndexAt(position) {
+        // Ported from the Rust 1.81 standard library binary search.
+        // I was too lazy to come up with the algorithm myself. Sorry to disappoint.
+
+        let size = this.lineBounds.length;
+        let left = 0;
+        let right = size;
+        while (left < right) {
+            let mid = (left + size / 2) | 0;
+
+            let isLess = this.lineBounds[mid].start < position;
+            let isEqual = this.lineBounds[mid].start == position;
+            left = isLess && !isEqual ? mid + 1 : left;
+            right = !isLess && !isEqual ? mid : right;
+            if (isEqual) {
+                return mid;
+            }
+
+            size = right - left;
+        }
+
+        return left - 1;
+    }
 }

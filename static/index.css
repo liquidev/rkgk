@@ -193,6 +193,8 @@ rkgk-code-editor {
         &>.line {
             flex-shrink: 0;
             white-space: pre-wrap;
+
+            min-height: var(--line-height-em);
         }
     }
 
@@ -225,7 +227,27 @@ rkgk-code-editor {
             }
         }
     }
-    
+
+    &>.layer:not(.layer-gutter) {
+        margin-left: var(--gutter-width);
+        width: calc(100% - var(--gutter-width));
+    }
+
+    &>.layer-error-squiggles {
+        color: transparent;
+
+        &>.line {
+            &>.squiggle {
+                text-decoration: underline wavy black;
+                text-decoration-skip-ink: none;
+            }
+
+            &>.squiggle-error {
+                text-decoration-color: var(--color-error);
+            }
+        }
+    }
+
     &>textarea {
         display: block;
         width: calc(100% - var(--gutter-width));

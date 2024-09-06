@@ -14,6 +14,8 @@
 
     --font-body: "Atkinson Hyperlegible", sans-serif;
     --font-monospace: "Iosevka Hyperlegible", monospace;
+    --line-height: 1.5;
+    --line-height-em: 1.5em;
 }
 
 /* Reset */ 
@@ -21,7 +23,7 @@
 body {
     margin: 0;
     color: var(--color-text);
-    line-height: 1.5;
+    line-height: var(--line-height);
 }
 
 /* Fonts */
@@ -37,7 +39,7 @@ button, textarea, input {
 
 pre, code, textarea {
     font-family: var(--font-monospace);
-    line-height: 1.5;
+    line-height: var(--line-height);
 }
 
 /* Buttons */

@@ -103,6 +103,216 @@ Additionally, the syntax `a | b` may be used to signify that one of the listed t
 
 `/` divides a number by another number.
 
+```haku
+floor
+  x : number
+  -> number
+
+ceil
+  x : number
+  -> number
+
+round
+  x : number
+  -> number
+```
+
+`floor`, `ceil`, and `round` are rounding functions.
+Each of them rounds a little differently:
+
+- `floor` rounds towards -∞.
+- `ceil` rounds towards +∞.
+- `round` rounds half towards +∞.
+
+```haku
+abs
+  x : number
+  -> number
+```
+
+`abs` returns the absolute value of the given number.
+
+If `x` is less than zero, returns `-x`.
+Otherwise returns `x`.
+
+```haku
+mod
+  x : number
+  y : number
+  -> number
+```
+
+`mod` is the modulo operation.
+
+It returns the remainder of dividing `x` by `y`.
+haku uses the Euclidean definition, which means the remainder returned by `mod` is _always non-negative_.
+
+```haku
+pow
+  base : number
+  exponent : number
+  -> number
+```
+
+`pow` raises `base` to the given `exponent`.
+
+```haku
+sqrt
+  x : number
+  -> number
+
+cbrt
+  x : nunber
+  -> number
+```
+
+`sqrt` returns the square root of the given number.
+
+`cbrt` returns the cubic root of the given number.
+
+Other roots may be obtained using `pow x (1 / base)`.
+
+```haku
+exp
+  x : number
+  -> number
+
+ln
+  x : number
+  -> number
+```
+
+In the following functions, `e` is the base of the natural logarithm (approximately `2.7128`.)
+The `e` constant (Euler's number) is currently not exposed to haku source code; you have to define it yourself.
+
+`exp` is the exponential function `pow e x`.
+
+`ln` is the natural logarithm (logarithm base `e` of `x`.)
+
+```haku
+expMinus1
+  x : number
+  -> number
+
+ln1Plus
+  x : number
+  -> number
+```
+
+`expMinus1` is `pow e x - 1`, but accurate even when `x` is close to zero.
+
+`ln1Plus` is `ln (1 + x)`, but more accurate than if the operations are performed separately.
+
+```haku
+exp2
+  x : number
+  -> number
+```
+
+`exp2` is the exponential function `pow 2 x`.
+
+```haku
+log2
+  x : number
+  -> number
+
+log10
+  x : number
+  -> number
+```
+
+`log2` is the logarithm base `2` of `x`.
+
+`log10` is the logarithm base `10` of `x`.
+
+```haku
+hypot
+  x : number
+  y : number
+  -> number
+```
+
+`hypot` is the hypotenuse of the Pythagorean triangle with right angle-adjacent sides `x` and `y`.
+
+```haku
+sin
+  x : number
+  -> number
+
+cos
+  x : number
+  -> number
+
+tan
+  x : number
+  -> number
+```
+
+`sin`, `cos`, and `tan` are the [trigonometric functions][] sine, cosine, and tangent.
+Their argument `x` is counted in radians.
+
+[trigonometric functions]: https://wikipedia.org/Trigonometric_functions
+
+```haku
+asin
+  x : number
+  -> number
+
+acos
+  x : number
+  -> number
+
+atan
+  x : number
+  -> number
+```
+
+`asin`, `acos`, and `atan` are the [inverse trigonometric functions][] arc sine, arc cosine, and arc tangent.
+Their argument `x` is counted in radians.
+
+[inverse trigonometric functions]: https://wikipedia.org/Inverse_trigonometric_functions
+
+```haku
+atan2
+  y : number
+  x : number
+  -> number
+```
+
+`atan2` is the angle between the positive X axis and a line that passes through `(0, 0)` and `(x, y)`.
+
+Note the reverse argument order---`y` comes first, due to `atan2` being a convenience function over `atan (y / x)` that is defined for all arguments.
+
+```haku
+sinh
+  x : number
+  -> number
+
+cosh
+  x : number
+  -> number
+
+tanh
+  x : number
+  -> number
+
+asinh
+  x : number
+  -> number
+
+acosh
+  x : number
+  -> number
+
+atanh
+  x : number
+  -> number
+```
+
+`sinh`, `cosh`, `tanh`, `asinh`, `acosh`, and `atanh`, are the six [hyperbolic functions][].
+
+[hyperbolic functions]: https://en.wikipedia.org/wiki/Hyperbolic_functions
+
 
 ## Logic
 

@@ -106,7 +106,7 @@ impl Display for ChunkError {
 impl Error for ChunkError {}
 
 pub mod fns {
-    use alloc::vec::Vec;
+    use alloc::{format, vec::Vec};
 
     use crate::{
         value::{Fill, List, Ref, Rgba, Scribble, Shape, Stroke, Value, Vec2, Vec4},
@@ -122,6 +122,36 @@ pub mod fns {
             0x02 Binary "*" => mul,
             0x03 Binary "/" => div,
             0x04 Unary "-" => neg,
+
+            0x10 Nary "floor" => floorf,
+            0x11 Nary "ceil" => ceilf,
+            0x12 Nary "round" => roundf,
+            0x13 Nary "abs" => fabsf,
+            0x14 Nary "mod" => fmodf,
+            0x15 Nary "pow" => powf,
+            0x16 Nary "sqrt" => sqrtf,
+            0x17 Nary "cbrt" => cbrtf,
+            0x18 Nary "exp" => expf,
+            0x19 Nary "exp2" => exp2f,
+            0x1A Nary "ln" => logf,
+            0x1B Nary "log2" => log2f,
+            0x1C Nary "log10" => log10f,
+            0x1D Nary "hypot" => hypotf,
+            0x1E Nary "sin" => sinf,
+            0x1F Nary "cos" => cosf,
+            0x20 Nary "tan" => tanf,
+            0x21 Nary "asin" => asinf,
+            0x22 Nary "acos" => acosf,
+            0x23 Nary "atan" => atanf,
+            0x24 Nary "atan2" => atan2f,
+            0x25 Nary "expMinus1" => expm1f,
+            0x26 Nary "ln1Plus" => log1pf,
+            0x27 Nary "sinh" => sinhf,
+            0x28 Nary "cosh" => coshf,
+            0x29 Nary "tanh" => tanhf,
+            0x2A Nary "asinh" => asinhf,
+            0x2B Nary "acosh" => acoshf,
+            0x2C Nary "atanh" => atanhf,
 
             0x40 Unary "!" => not,
             0x41 Binary "==" => eq,
@@ -183,6 +213,85 @@ pub mod fns {
     pub fn neg(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
         let x = args.get_number(vm, 0, "`-` can only work with numbers")?;
         Ok(Value::Number(-x))
+    }
+
+    #[inline(never)]
+    fn math1(vm: &mut Vm, args: FnArgs, name: &str, f: fn(f32) -> f32) -> Result<Value, Exception> {
+        if args.num() != 1 {
+            return Err(
+                vm.create_exception(format!("`{name}` expects a single argument ({name} x)"))
+            );
+        }
+
+        let x = args
+            .get(vm, 0)
+            .to_number()
+            .ok_or_else(|| vm.create_exception(format!("`{name}` argument must be a number")))?;
+        Ok(Value::Number(f(x)))
+    }
+
+    #[inline(never)]
+    fn math2(
+        vm: &mut Vm,
+        args: FnArgs,
+        name: &str,
+        f: fn(f32, f32) -> f32,
+    ) -> Result<Value, Exception> {
+        if args.num() != 2 {
+            return Err(vm.create_exception(format!("`{name}` expects two arguments ({name} x y)")));
+        }
+
+        let x = args
+            .get(vm, 0)
+            .to_number()
+            .ok_or_else(|| vm.create_exception(format!("`{name}` arguments must be numbers")))?;
+        let y = args
+            .get(vm, 1)
+            .to_number()
+            .ok_or_else(|| vm.create_exception(format!("`{name}` arguments must be numbers")))?;
+        Ok(Value::Number(f(x, y)))
+    }
+
+    macro_rules! math_fns {
+        ($($arity:tt $sysname:tt $name:tt),* $(,)?) => {
+            $(
+                pub fn $name(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {
+                    $arity(vm, args, $sysname, libm::$name)
+                }
+            )*
+        }
+    }
+
+    math_fns! {
+        math1 "floor" floorf,
+        math1 "ceil" ceilf,
+        math1 "round" roundf,
+        math1 "abs" fabsf,
+        math2 "mod" fmodf,
+        math2 "pow" powf,
+        math1 "sqrt" sqrtf,
+        math1 "cbrt" cbrtf,
+        math1 "exp" expf,
+        math1 "exp2" exp2f,
+        math1 "ln" logf,
+        math1 "log2" log2f,
+        math1 "log10" log10f,
+        math2 "hypot" hypotf,
+        math1 "sin" sinf,
+        math1 "cos" cosf,
+        math1 "tan" tanf,
+        math1 "asin" asinf,
+        math1 "acos" acosf,
+        math1 "atan" atanf,
+        math2 "atan2" atan2f,
+        math1 "expMinus1" expm1f,
+        math1 "ln1Plus" log1pf,
+        math1 "sinh" sinhf,
+        math1 "cosh" coshf,
+        math1 "tanh" tanhf,
+        math1 "asinh" asinhf,
+        math1 "acosh" acoshf,
+        math1 "atanh" atanhf,
     }
 
     pub fn not(vm: &mut Vm, args: FnArgs) -> Result<Value, Exception> {

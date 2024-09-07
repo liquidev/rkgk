@@ -497,6 +497,7 @@ fn lambda(p: &mut Parser) -> Closed {
 fn if_expr(p: &mut Parser) -> Closed {
     let o = p.open();
 
+    let if_span = p.span();
     p.advance(); // if
     if p.peek() != TokenKind::LParen {
         let span = p.span();
@@ -522,9 +523,8 @@ fn if_expr(p: &mut Parser) -> Closed {
     p.optional_newline();
 
     if p.peek() != TokenKind::Else {
-        let span = p.span();
         p.emit(Diagnostic::error(
-            span,
+            if_span,
             "`if` expression is missing an `else` clause",
         ));
     }

@@ -12,6 +12,7 @@ pub fn serialize(f: &mut fmt::Formatter<'_>, prefix: &str, bytes: &[u8; 32]) -> 
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct InvalidId;
 
 pub fn deserialize(s: &str, prefix: &str) -> Result<[u8; 32], InvalidId> {

@@ -45,12 +45,20 @@ export class BrushPreview extends HTMLElement {
     }
 
     renderBrush(haku) {
-        this.classList.remove("error");
+        this.unsetErrorFlag();
         let result = this.#renderBrushInner(haku);
         if (result.status == "error") {
-            this.classList.add("error");
+            this.setErrorFlag();
         }
         return result;
+    }
+
+    unsetErrorFlag() {
+        this.classList.remove("error");
+    }
+
+    setErrorFlag() {
+        this.classList.add("error");
     }
 }
 

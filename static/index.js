@@ -265,7 +265,10 @@ function readUrl(urlString) {
         let compileResult = currentUser.setBrush(brushEditor.code);
         brushEditor.renderHakuResult("Compilation", compileResult);
 
-        if (compileResult.status != "ok") return;
+        if (compileResult.status != "ok") {
+            brushPreview.setErrorFlag();
+            return;
+        }
 
         let previewResult = brushPreview.renderBrush(currentUser.haku);
         if (previewResult.status == "error") {

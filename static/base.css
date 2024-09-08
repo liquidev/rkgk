@@ -26,6 +26,10 @@ body {
     line-height: var(--line-height);
 }
 
+* {
+    box-sizing: border-box;
+}
+
 /* Fonts */
 
 :root {

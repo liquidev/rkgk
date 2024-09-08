@@ -16,6 +16,7 @@ let main = document.querySelector("main");
 let canvasRenderer = main.querySelector("rkgk-canvas-renderer");
 let reticleRenderer = main.querySelector("rkgk-reticle-renderer");
 let brushEditor = main.querySelector("rkgk-brush-editor");
+let brushPreview = main.querySelector("rkgk-brush-preview");
 let welcome = main.querySelector("rkgk-welcome");
 let connectionStatus = main.querySelector("rkgk-connection-status");
 
@@ -260,10 +261,25 @@ function readUrl(urlString) {
         updateUrl(session, canvasRenderer.viewport),
     );
 
-    brushEditor.renderHakuResult("Compilation", currentUser.setBrush(brushEditor.code));
+    function compileBrush() {
+        let compileResult = currentUser.setBrush(brushEditor.code);
+        brushEditor.renderHakuResult("Compilation", compileResult);
+
+        if (compileResult.status != "ok") return;
+
+        let previewResult = brushPreview.renderBrush(currentUser.haku);
+        if (previewResult.status == "error") {
+            brushEditor.renderHakuResult(
+                previewResult.phase == "eval" ? "Evaluation" : "Rendering",
+                previewResult.result,
+            );
+        }
+    }
+
+    compileBrush();
     brushEditor.addEventListener(".codeChanged", async () => {
         flushPlotQueue();
-        brushEditor.renderHakuResult("Compilation", currentUser.setBrush(brushEditor.code));
+        compileBrush();
         session.sendSetBrush(brushEditor.code);
     });
 

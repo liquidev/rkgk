@@ -47,6 +47,7 @@ export class ResizeHandle extends HTMLElement {
             let mouseDown = await listen([this, "mousedown"]);
             let startingSize = this.size;
             if (mouseDown.button == 0) {
+                mouseDown.preventDefault();
                 this.classList.add("dragging");
 
                 while (true) {

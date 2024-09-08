@@ -1,4 +1,5 @@
 import { CodeEditor, getLineStart } from "rkgk/code-editor.js";
+import { BrushPreview } from "rkgk/brush-preview.js";
 
 const defaultBrush = `
 -- This is your brush.

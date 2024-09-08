@@ -22,6 +22,7 @@
             import "rkgk/live-reload.js";
 
             import "rkgk/brush-editor.js";
+            import "rkgk/brush-preview.js";
             import "rkgk/canvas-renderer.js";
             import "rkgk/connection-status.js";
             import "rkgk/framework.js";
@@ -59,14 +60,20 @@
                     <hr>
                     <a href="/docs/rkgk.html">Manual</a>
                 </div>
+
                 <div class="right">
+                    <div class="floating">
+                        <rkgk-brush-preview></rkgk-brush-preview>
+                    </div>
                     <rkgk-resize-handle
                         data-direction="vertical"
                         data-target="panels-overlay"
                         data-target-property="--right-width"
-                        data-init-size="384"
-                        data-min-size="128"></rkgk-resize-handle>
-                    <rkgk-brush-editor></rkgk-brush-editor>
+                        data-init-size="512"
+                        data-min-size="384"></rkgk-resize-handle>
+                    <div class="docked">
+                        <rkgk-brush-editor></rkgk-brush-editor>
+                    </div>
                 </div>
             </div>
 

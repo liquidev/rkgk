@@ -32,7 +32,7 @@ main {
         padding: 16px;
 
         display: grid;
-        grid-template-columns: [left] 1fr [right-resize] auto [right] var(--right-width);
+        grid-template-columns: [left] 1fr [right-resize] auto [right] minmax(0, var(--right-width));
 
         /* Pass all events through. Children may receive events as normal. */
         pointer-events: none;
@@ -43,23 +43,34 @@ main {
 
         &>.right {
             grid-column: right / right;
-            height: fit-content;
             min-height: 0;
-            max-height: 100%;
 
-            display: flex;
-            flex-direction: row;
-            justify-content: stretch;
+            display: grid;
+            grid-template-rows: minmax(0, min-content);
+            grid-template-columns: [floating] max-content [resize] min-content [docked] auto;
 
-            &>rkgk-resize-handle {
-                flex-shrink: 0;
-                height: auto;
+            padding-left: 16px;
+
+            pointer-events: none;
+
+            &>* {
+                min-width: 0;
+                min-height: 0;
             }
 
-            &>rkgk-brush-editor {
-                height: auto;
-                overflow: auto;
-                flex-grow: 1;
+            &>rkgk-resize-handle {
+                pointer-events: auto;
+            }
+
+            &>.docked>rkgk-brush-editor {
+                max-height: 100%;
+                pointer-events: auto;
+            }
+
+            &>.floating>rkgk-brush-preview {
+                width: 128px;
+                height: 128px;
+                pointer-events: auto;
             }
         }
     }
@@ -175,6 +186,8 @@ rkgk-code-editor {
     position: relative;
     width: 100%;
 
+    overflow: auto;
+
     &>.layer {
         position: absolute;
         left: 0;
@@ -259,13 +272,28 @@ rkgk-code-editor {
         resize: none;
         white-space: pre-wrap;
         border: none;
+
+        &:focus {
+            outline: none;
+        }
+    }
+
+    &:has(textarea:focus) {
+        outline: 1px solid var(--color-brand-blue);
+        outline-offset: 4px;
     }
 }
 
 /* Brush editor */
 
-rkgk-brush-editor {
+rkgk-brush-editor.rkgk-panel {
     padding: 12px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    position: relative;
     
     &>.text-area {
         display: block;
@@ -283,8 +311,8 @@ rkgk-brush-editor {
     }
 
     &>.error-header {
-        margin-top: 1em;
-        margin-bottom: 0;
+        margin: 0;
+        margin-top: 0.5em;
         font-size: 1rem;
         color: var(--color-error);
     }
@@ -293,6 +321,36 @@ rkgk-brush-editor {
         margin: 0;
         color: var(--color-error);
         white-space: pre-wrap;
+    }
+}
+
+/* Brush preview */
+
+rkgk-brush-preview {
+    --checkerboard-light: #f2f2f2;
+    --checkerboard-dark: #e1e1e1;
+    --checkerboard-size: 64px;
+
+    display: block;
+    position: relative;
+
+    background:
+        repeating-conic-gradient(var(--checkerboard-light) 0% 25%, var(--checkerboard-dark) 0% 50%)
+        50% 50% / var(--checkerboard-size) var(--checkerboard-size);
+    border-radius: 4px;
+
+    &.error {
+        &>canvas {
+            display: none;
+        }
+
+        &::before {
+            content: "(error)";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
     }
 }
 
@@ -359,7 +417,8 @@ rkgk-connection-status {
         }
 
         &.icon {
-            padding: 4px 4px;
+            width: 24px;
+            height: 24px;
         }
 
         &:first-child {
